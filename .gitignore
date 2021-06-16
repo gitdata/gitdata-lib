@@ -1,0 +1,15 @@
+*\.pyc
+*\.swp
+*py\.swo
+testsold
+.ropeproject
+.coverage
+*.log
+.linter*
+__pycache__
+/*\.png
+.vscode
+docs/_build
+build
+dist
+gitdata_lib.egg-info
