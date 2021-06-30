@@ -1,0 +1,10 @@
+
+stages:
+  - test
+
+unittest:
+  stage: test
+  image: python:3.9
+  script:
+    - source tests/setup_container.sh
+    - nosetests --with-doctest --with-coverage --cover-package=gitdata -vx gitdata/utils.py tests/unittests
