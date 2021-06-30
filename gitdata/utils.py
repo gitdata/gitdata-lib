@@ -141,6 +141,31 @@ class Record(dict):
 
     __setattr__ = dict.__setitem__
 
+    def __getitem__(self, name):
+        try:
+            value = dict.__getitem__(self, name)
+            if hasattr(value, '__get__'):
+                getter = getattr(value, '__get__')
+                if getter is not None:
+                    return getter(self)
+                else:
+                    return value
+            else:
+                return value
+        except KeyError as k:
+            try:
+                value = self.__class__.__dict__[name]
+                if hasattr(value, '__get__'):
+                    getter = getattr(value, '__get__')
+                    if getter:
+                        return getter(self)
+                    else:
+                        return value
+                else:
+                    return value
+            except KeyError as k:
+                raise k
+
     def __getattr__(self, key):
         try:
             return self.__getitem__(key)

@@ -2,6 +2,7 @@
     gitdata
 """
 
+from .utils import Record
 
 def fetch(_):
     """Fetch data
