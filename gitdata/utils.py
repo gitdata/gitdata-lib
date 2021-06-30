@@ -6,8 +6,6 @@ import inspect
 import logging
 import os
 
-import gitdata
-
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +14,7 @@ def libpath(*args):
     """Returns the location of a standard gitdata-lib asset
 
     >>> import os
-    >>> asset_path = libpath('gitdata', 'assets', 'README.md')
+    >>> asset_path = libpath('assets', 'README.md')
     >>> os.path.exists(asset_path)
     True
 
@@ -24,7 +22,7 @@ def libpath(*args):
     realpath = os.path.realpath
     dirname = os.path.dirname
     join = os.path.join
-    return realpath(join(realpath(dirname(gitdata.__file__)), '..', *args))
+    return realpath(join(realpath(dirname(__file__)), *args))
 
 
 def thispath(*args):
