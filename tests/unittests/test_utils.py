@@ -2,10 +2,6 @@
     test utils
 """
 
-# pylint: disable=missing-docstring
-# pylint: disable=invalid-name
-# It's reasonable in this case.
-
 import unittest
 
 from gitdata import Record
