@@ -85,6 +85,19 @@ def sorted_column_names(names):
     return result
 
 
+def kind(o):
+    """
+    returns a text version of an object class name
+    """
+    n = []
+    for c in o.__class__.__name__:
+        if c.isalpha() or c == '_':
+            if c.isupper() and len(n):
+                n.append('_')
+            n.append(c.lower())
+    return ''.join(n)
+
+
 class Bunch:
     """a handy bunch of variables
 
@@ -191,13 +204,7 @@ class Record(dict):
 
     def attributes(self):
         """Return propoerties and members as one set"""
-
-        def properties():
-            items = self.__class__.__dict__.items()
-            return [k for k, v in items if isinstance(v, property)]
-
-        names = list(self.keys()) + properties()
-        return sorted_column_names(names)
+        return get_attributes(self)
 
     def __str__(self):
         name = self.__class__.__name__
@@ -464,3 +471,98 @@ class ItemList(list):
 
         return '\n'.join(lines)
 
+
+def get_properties(obj):
+    if type(obj) == dict:
+        return []
+    klass = obj.__class__
+    return [
+        i for i, j in (
+            (n, getattr(klass, n)) for n in dir(klass)
+        ) if type(j) == property
+    ]
+
+
+def get_attributes(obj):
+    names = list(obj.keys()) + get_properties(obj)
+    return sorted_column_names(names)
+
+
+class RecordList(list):
+    """a list of Records"""
+
+    def __init__(self, *a, **k):
+        list.__init__(self, *a, **k)
+        self._n = 0
+
+    def __iter__(self):
+        self._n = 0
+        return self
+
+    def __next__(self):
+        if self._n >= len(self):
+            raise StopIteration
+        else:
+            result = self[self._n]
+            self._n += 1
+        return result
+
+    def __str__(self):
+        """
+        represent as a string
+
+        >>> import datetime
+        >>> class Person(Record): pass
+        >>> class People(RecordList): pass
+        >>> people = People()
+        >>> people.append(Person(_id=1, name='Joe', age=20,
+        ...     birthdate=datetime.date(1992,5,5)))
+        >>> people.append(Person(_id=2, name='Samuel', age=25,
+        ...     birthdate=datetime.date(1992,4,5)))
+        >>> people.append(Person(_id=3, name='Sam', age=35,
+        ...     birthdate=datetime.date(1992,3,5)))
+        >>> print(people)
+        person
+        _id name   age birthdate
+        --- ------ --- ----------
+          1 Joe     20 1992-05-05
+          2 Samuel  25 1992-04-05
+          3 Sam     35 1992-03-05
+        3 person records
+
+        >>> class Player(Person):
+        ...    @property
+        ...    def score(self):
+        ...        return 10
+        >>> people = People()
+        >>> people.append(Player(userid=1, name='Joe', age=20,
+        ...     birthdate=datetime.date(1992,5,5)))
+        >>> people.append(Player(userid=2, name='Samuel', age=25,
+        ...     birthdate=datetime.date(1992,4,5)))
+        >>> people.append(Player(userid=3, name='Sam', age=35,
+        ...     birthdate=datetime.date(1992,3,5)))
+        >>> print(people)
+        player
+        userid name   age score birthdate
+        ------ ------ --- ----- ----------
+             1 Joe     20    10 1992-05-05
+             2 Samuel  25    10 1992-04-05
+             3 Sam     35    10 1992-03-05
+        3 player records
+
+        """
+
+        def visible(name):
+            return not name.startswith('__')
+
+        if not bool(self):
+            return 'Empty list'
+
+        title = '%s\n' % kind(self[0])
+
+        keys = labels = list(filter(visible, get_attributes(self[0])))
+        rows = [[getattr(record, key, None) for key in keys] for record in self]
+
+        footer = '\n{} {} records'.format(len(self), kind(self[0]))
+
+        return title + str(ItemList(rows, labels=labels)) + footer
