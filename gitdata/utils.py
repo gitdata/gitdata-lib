@@ -2,6 +2,8 @@
     gitdata utils
 """
 
+import datetime
+import decimal
 import inspect
 import logging
 import os
@@ -251,3 +253,214 @@ class Record(dict):
             self['__store']
         )
         return record_id
+
+
+class ItemList(list):
+    """
+    list of data items
+
+    >>> items = ItemList()
+    >>> items.append(['Joe', 12, 125])
+    >>> items
+    [['Joe', 12, 125]]
+    >>> print(items)
+    Column 0 Column 1 Column 2
+    -------- -------- --------
+    Joe            12      125
+
+    >>> items.insert(0, ['Name', 'Score', 'Points'])
+    >>> print(items)
+    Name Score Points
+    ---- ----- ------
+    Joe     12    125
+
+    >>> data = [
+    ...     ['Joe', 12, 125],
+    ...     ['Sally', 13, 1354],
+    ... ]
+    >>> items = ItemList(data)
+    >>> print(items)
+    Column 0 Column 1 Column 2
+    -------- -------- --------
+    Joe            12      125
+    Sally          13    1,354
+
+    >>> data = [
+    ...     ['Joe', 12, 125],
+    ...     ['Sally', 13, 135],
+    ... ]
+    >>> items = ItemList(data, labels=['Name', 'Score', 'Points'])
+    >>> print(items)
+    Name  Score Points
+    ----- ----- ------
+    Joe      12    125
+    Sally    13    135
+
+    >>> data = [
+    ...     [10000, 'Joe', 12, 125],
+    ...     [10001, 'Sally', 13, 135],
+    ... ]
+    >>> items = ItemList(data, labels=['_id', 'Name', 'Score', 'Points'])
+    >>> print(items)
+    _id   Name  Score Points
+    ----- ----- ----- ------
+    10000 Joe      12    125
+    10001 Sally    13    135
+
+    >>> now = datetime.date(2020, 2, 1)
+    >>> data = [
+    ...     [10000, 'Joe', now - datetime.date(1980, 1, 20)],
+    ...     [10001, 'Sally', now - datetime.date(1984, 9, 20)],
+    ... ]
+    >>> items = ItemList(data, labels=['_id', 'Name', 'Age'])
+    >>> print(items)
+    _id   Name  Age
+    ----- ----- -------------------
+    10000 Joe   14622 days, 0:00:00
+    10001 Sally 12917 days, 0:00:00
+
+    >>> now = datetime.date(2020, 2, 1)
+    >>> data = [
+    ...     [10000, 'Joe', now - datetime.date(1980, 1, 20)],
+    ...     [10001, 'Sally', now - datetime.date(1984, 9, 20)],
+    ... ]
+    >>> items = ItemList(data, labels=['user_id', 'Name', 'Age'])
+    >>> print(items)
+    user_id Name  Age
+    ------- ----- -------------------
+      10000 Joe   14622 days, 0:00:00
+      10001 Sally 12917 days, 0:00:00
+
+    >>> import datetime
+    >>> now = datetime.date(2020, 2, 1)
+    >>> data = [
+    ...     [9000, 'Greens', 1234],
+    ...     [10000, 'Browns', 1203],
+    ... ]
+    >>> items = ItemList(data, labels=['id', 'customer', 'invoice_number'])
+    >>> print(items)
+    id    customer invoice_number
+    ----- -------- --------------
+     9000 Greens             1234
+    10000 Browns             1203
+    """
+    def __init__(self, *args, **kwargs):
+        self.labels = kwargs.pop('labels', None)
+        list.__init__(self, *args, **kwargs)
+
+    def __str__(self):
+        def is_text(value):
+            return type(value) in [str, bytes]
+
+        def name_column(number):
+            return 'Column {}'.format(number)
+
+        def is_homogeneous(values):
+            return any([
+                len(values) <= 1,
+                all(type(values[0]) == type(i) for i in values[1:]),
+            ])
+
+        def get_format(label, values):
+            first_non_null = list(
+                map(type, [a for a in values if a is not None])
+            )[:1]
+            if first_non_null:
+                data_type = first_non_null[0]
+                if label in ['_id', 'userid']:
+                    return '{:>{width}}'
+                elif label == 'id':
+                    return '{:>{width}}'
+                elif label.endswith('_id'):
+                    return '{:>{width}}'
+                elif label.endswith('_number'):
+                    return '{:>{width}}'
+                elif data_type in [int, float, decimal.Decimal]:
+                    return '{:{width},}'
+                elif data_type in [datetime.date]:
+                    return '{:%Y-%m-%d}'
+                elif data_type in [datetime.timedelta]:
+                    return '{:}'
+                elif data_type in [datetime.datetime]:
+                    return '{:%Y-%m-%d %H:%M:%S}'
+            return '{:<{width}}'
+
+        def nvl(value):
+            if value is None:
+                return 'None'
+            return value
+
+        if len(self) == 0:
+            return ''
+
+        num_columns = len(list(self[0]))
+        columns = list(range(num_columns))
+
+        # calculate labels
+        if self.labels:
+            labels = self.labels
+            offset = 0
+        else:
+            if not all(is_text(label) for label in self[0]):
+                labels = [name_column(i) for i in range(num_columns)]
+                offset = 0
+            else:
+                labels = self[0]
+                offset = 1
+
+        # rows containing data
+        rows = [list(nvl(v) for v in row) for row in self[offset:]]
+
+        # calculate formats
+        formats = []
+        for col in columns:
+            values = [row[col] for row in rows]
+            if is_homogeneous(values):
+                formats.append(get_format(labels[col], values))
+            else:
+                formats.append('{}')
+
+        # calulate formatted values
+        formatted_values = [labels] + [
+            [
+                formats[col].format(row[col], width=0)
+                for col in columns
+            ] for row in rows
+        ]
+
+        # calculate column widths
+        data_widths = {}
+        for row in formatted_values:
+            for col in columns:
+                n = data_widths.get(col, 0)
+                m = len(row[col])
+                if n < m:
+                    data_widths[col] = m
+
+        label_format = '{:<{width}}'
+        formatted_labels = [
+            label_format.format(l, width=data_widths[i])
+            for i, l in enumerate(labels)
+        ]
+
+        sorted_names = sorted_column_names(labels)
+
+        for i, v in enumerate(formats):
+            formats[i] = v if v != '{}' else '{:<{width}}'
+
+        if not self.labels:
+            columns = sorted(columns, key=lambda a: sorted_names.index(labels[a]))
+        dashes = ['-' * data_widths[col] for col in columns]
+        sorted_labels = [formatted_labels[col] for col in columns]
+
+        aligned_rows = [sorted_labels] + [dashes] + [
+            [
+                formats[col].format(row[col], width=data_widths[col])
+                for col in columns
+            ] for row in rows
+        ]
+
+        lines = [' '.join(row).rstrip() for row in aligned_rows]
+
+        return '\n'.join(lines)
+
