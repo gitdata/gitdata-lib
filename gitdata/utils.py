@@ -83,6 +83,17 @@ def sorted_column_names(names):
     return result
 
 
+class Bunch:
+    """a handy bunch of variables
+
+    >>> something = Bunch(name='Cat', colour='Brown')
+    >>> something.name
+    'Cat'
+    """
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class Record(dict):
     """Record Class
 
