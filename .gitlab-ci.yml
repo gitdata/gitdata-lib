@@ -5,6 +5,11 @@ stages:
 unittest:
   stage: test
   image: python:3.9
+  services:
+    - mariadb:latest
+  variables:
+    MYSQL_DATABASE: gitdatatest
+    MYSQL_ROOT_PASSWORD: root
   script:
     - source tests/setup_container.sh
     - nosetests --with-doctest --with-coverage --cover-package=gitdata -vx gitdata/utils.py tests/unittests
