@@ -24,5 +24,19 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(gitdata.config.get('GITDATA_TEST_VAR'), 'foo')
 
     def test_instance_setting(self):
-        self.assertEqual(gitdata.config.get('TIME_ZONE'), 'UTM')
-        # self.assertEqual(gitdata.config.get('EMAIL_HOST'), 'myhost')
+        start = os.path.dirname(__file__)
+        config_file_pathname = gitdata.config.locate_config_file(start=start)
+        config = gitdata.config.load_config(config_file_pathname)
+        self.assertEqual(config.get('email.host'), 'mail.mailer.com')
+
+    def test_config_key_name(self):
+        start = os.path.dirname(__file__)
+        config_file_pathname = gitdata.config.locate_config_file(start=start)
+        config = gitdata.config.load_config(config_file_pathname)
+        self.assertEqual(config.get('database.engine.host'), 'localhost')
+
+    def test_config_cast(self):
+        start = os.path.dirname(__file__)
+        config_file_pathname = gitdata.config.locate_config_file(start=start)
+        config = gitdata.config.load_config(config_file_pathname)
+        self.assertEqual(config.get('email.port', cast=int), 22)
