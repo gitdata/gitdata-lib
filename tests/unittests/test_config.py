@@ -39,6 +39,12 @@ class ConfigTests(unittest.TestCase):
         config = gitdata.config.load_config(config_file_pathname)
         self.assertEqual(config.get('email.port', cast=int), 22)
 
+    def test_config_default(self):
+        start = os.path.dirname(__file__)
+        config_file_pathname = gitdata.config.locate_config_file(start=start)
+        config = gitdata.config.load_config(config_file_pathname)
+        self.assertEqual(config.get('email.alias', default='support@testco.com'), 'support@testco.com')
+
     def test_read_user_config(self):
         start = os.path.dirname(__file__)
         config_file_pathname = gitdata.config.locate_config_file(filename='.gitdata', start=start)
