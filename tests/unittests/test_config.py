@@ -5,8 +5,6 @@
 import os
 import unittest
 
-os.environ['GITDATA_EMAIL_HOST'] = 'myhost'
-
 import gitdata.config
 
 
@@ -40,3 +38,9 @@ class ConfigTests(unittest.TestCase):
         config_file_pathname = gitdata.config.locate_config_file(start=start)
         config = gitdata.config.load_config(config_file_pathname)
         self.assertEqual(config.get('email.port', cast=int), 22)
+
+    def test_read_user_config(self):
+        start = os.path.dirname(__file__)
+        config_file_pathname = gitdata.config.locate_config_file(filename='.gitdata', start=start)
+        config = gitdata.config.Config(config_file_pathname)
+        self.assertEqual(config.get('user.time_zone'), 'America/Pacific')

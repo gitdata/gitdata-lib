@@ -138,8 +138,6 @@ class Config:
         )
 
 
-
-
 def locate_config_file(filename='gitdata.ini', start='.'):
     """locate a config file
 
