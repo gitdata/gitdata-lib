@@ -12,8 +12,6 @@ import gitdata
 from gitdata.utils import Record, RecordList
 from gitdata.stores.entities import EntityStore
 
-from zoom.sqltools import make_store_select, less_than, gt, entify
-
 
 class Person(Record):
     pass
@@ -138,31 +136,6 @@ class TestStore(unittest.TestCase):
         empty_store = EntityStore(self.db, 'none_of_these')
         self.assertEqual(type(empty_store.all()), RecordList)
         self.assertEqual(str(empty_store), 'Empty list')
-
-    def test_make_store_select(self):
-        data = [
-            dict(name='Alice', size=100, amount=2200),
-            dict(name='Janice', size=510, amount=200),
-            dict(name='Jimmy', size=200, amount=2100),
-            dict(name='Ozzy', size=401, amount=1900),
-            dict(name='Angus', size=510, amount=200),
-        ]
-        people = zoom.store_of(Person, self.db)
-        for row in data:
-            people.put(row)
-        low = set([person.name for person in people.find(amount=200)])
-        self.assertEqual(low, set(['Janice', 'Angus']))
-
-        cmd = make_store_select('person', amount=less_than(2000), size=gt(401))
-        rows = entify(self.db(cmd))
-        by_id = lambda a: a['_id']
-        self.assertEqual(
-            sorted(rows, key=by_id),
-            sorted([
-                {'_id': 5, 'name': 'Janice', 'size': 510, 'amount': 200},
-                {'_id': 8, 'name': 'Angus', 'size': 510, 'amount': 200},
-            ], key=by_id)
-        )
 
 
 class TestEntify(unittest.TestCase):
