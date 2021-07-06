@@ -5,10 +5,8 @@
 """
 
 from decimal import Decimal
-from datetime import date, time, datetime
+from datetime import date, datetime
 import unittest
-
-import zoom
 
 import gitdata
 from gitdata.utils import Record, RecordList
