@@ -641,7 +641,7 @@ class RecordList(list):
         title = '%s\n' % kind(self[0])
 
         keys = labels = list(filter(visible, get_attributes(self[0])))
-        rows = [[getattr(record, key, None) for key in keys] for record in self]
+        rows = [[getattr(record, key, record.get(key)) for key in keys] for record in self]
 
         footer = '\n{} {} records'.format(len(self), kind(self[0]))
 
