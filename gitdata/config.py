@@ -199,7 +199,7 @@ def get(key, cast=None, default=None, required=False):
     >>> got_it = False
     >>> try:
     ...     get('MISSING_SECRET')
-    ... except UndefinedValueError:
+    ... except UndefinedConfigValueError:
     ...     got_it = True
     >>> got_it
     True
