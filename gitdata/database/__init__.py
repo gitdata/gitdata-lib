@@ -3,7 +3,7 @@
 """
 
 from .common import Database
-from .sqlite3 import Sqlite3Database
+from .sqlite3 import Sqlite3Database, setup_test
 from .mysql import MySQLDatabase
 
 
@@ -11,10 +11,10 @@ class UnknownDatabaseException(Exception):
     """Unknown Database Exception"""
 
 
-def database(engine='sqlite3', **kwargs):
+def connect(engine='sqlite3', **kwargs):
     """Returns a Database object
 
-    >>> db = database()
+    >>> db = connect()
     >>> db('drop table if exists person')
     >>> db(\"\"\"
     ...     create table if not exists person (
@@ -49,7 +49,7 @@ def database(engine='sqlite3', **kwargs):
     ...     )
     ... \"\"\"
     >>> insert_person = "insert into person (name, age) values (%s, %s)"
-    >>> with database(database=':memory:') as db:
+    >>> with connect(database=':memory:') as db:
     ...    db(create_person_table)
     ...    db(insert_person, 'Joe', 32)
     ...    db('select * from person')

@@ -18,7 +18,7 @@ from datetime import date
 
 import gitdata
 from gitdata.database import (
-    database,
+    connect,
     # connect_database,
     # DatabaseException,
     # UnknownDatabaseException,
@@ -458,7 +458,7 @@ class DatabaseTests:
 class TestSqlite3Database(unittest.TestCase, DatabaseTests):
 
     def setUp(self):
-        self.db = database()
+        self.db = connect()
         self.create_cmd  = """
             create table gitdata_test_table
             (
@@ -564,7 +564,7 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
     def setUp(self):
         get = os.environ.get
 
-        self.db = database(
+        self.db = connect(
             'mysql',
             host=get('GITDATA_TEST_DATABASE_HOST', 'localhost'),
             user=get('GITDATA_TEST_DATABASE_USER', 'testuser'),

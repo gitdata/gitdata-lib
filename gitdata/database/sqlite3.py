@@ -6,6 +6,7 @@ from decimal import Decimal
 import sqlite3
 import logging
 
+import gitdata
 from gitdata.database import Database
 
 logger = logging.getLogger(__name__)
@@ -82,3 +83,9 @@ class Sqlite3Database(Database):
 
     def transaction(self):
         return Sqlite3DatabaseTransaction(self)
+
+def setup_test():
+    """Setup Test Database"""
+    db = Sqlite3Database()
+    db.run(gitdata.utils.libpath('database/sqlite3_setup_test_data.sql'))
+    return db

@@ -2,6 +2,7 @@
     gitdata
 """
 
+from . import database
 from .utils import Record
 
 def fetch(_):
