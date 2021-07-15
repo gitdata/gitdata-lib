@@ -865,7 +865,7 @@ def table_of(klass, db=None, name=None, key='id'):
     >>> person['age']
     20
     """
-    db = db or gitdata.connect()
+    db = db or gitdata.database.connect()
     if isinstance(klass, str):
         return RecordStore(db, name=name or klass, key=key)
     else:

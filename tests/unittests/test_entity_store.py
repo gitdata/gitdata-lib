@@ -10,7 +10,7 @@ import unittest
 
 import gitdata
 from gitdata.utils import Record, RecordList
-from gitdata.stores.entities import EntityStore
+from gitdata.stores.entities import EntityStore, store_of
 
 
 class Person(Record):
@@ -25,7 +25,7 @@ class TestStore(unittest.TestCase):
 
     def setUp(self):
         self.db = gitdata.database.setup_test()
-        self.people = EntityStore(self.db, Person)
+        self.people = store_of(Person, db=self.db)
         self.joe_id = self.people.put(Person(name='Joe', age=50))
         self.sam_id = self.people.put(Person(name='Sam', age=25))
         self.people.put(Person(name='Ann', age=30))

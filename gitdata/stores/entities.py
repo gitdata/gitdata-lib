@@ -939,5 +939,5 @@ def store_of(klass, db=None, name=None):
     25
 
     """
-    db = db or gitdata.connect()
+    db = db or gitdata.database.connect()
     return EntityStore(db, klass, kind=name)

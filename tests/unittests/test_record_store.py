@@ -50,7 +50,7 @@ class TestRecordStore(unittest.TestCase):
         """.format(key=self.key, name=self.name))
 
     def get_record_store(self):
-        return RecordStore(self.db, Person)
+        return table_of(Person, db=self.db)
 
     def setUp(self):
         self.db = setup_test()
