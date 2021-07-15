@@ -28,7 +28,7 @@ def get_result_iterator(rows, storage):
     names = [d[0] == 'id' and '_id' or d[0] for d in rows.cursor.description]
     for rec in rows:
         yield cls(
-            ((k, v) for k, v in zip(names, rec) if v is not None),
+            ((k, v) for k, v in zip(names, rec)),
             __store=storage,
         )
 

@@ -80,6 +80,9 @@ class TestRecordStore(unittest.TestCase):
                 self.id_name: jane_id,
                 'name': 'Jane',
                 'age': 25,
+                'done': None,
+                'kids': None,
+                'birthdate': None,
             }
         )
 
@@ -92,6 +95,9 @@ class TestRecordStore(unittest.TestCase):
                 self.id_name: self.joe_id,
                 'name': 'Joe',
                 'age': 50,
+                'done': None,
+                'kids': None,
+                'birthdate': None,
             }
         )
 
