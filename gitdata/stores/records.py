@@ -64,129 +64,25 @@ class RecordStore(Store):
     >>> people = People(db, Person)
     >>> people.kind
     'person'
+
     >>> joe = Person(name='Joe', age=20, birthdate=datetime.date(1992,5,5))
-    >>> repr(joe) == (
-    ...     "<Person {'name': 'Joe', 'age': 20, "
-    ...     "'birthdate': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
+    >>> print(joe)
+    Person
+      name ................: 'Joe'
+      age .................: 20
+      birthdate ...........: datetime.date(1992, 5, 5)
+
     >>> people.put(joe)
     1
     >>> person = people.get(1)
-    >>> repr(person) == (
-    ...     "<Person {'name': 'Joe', 'age': 20, "
-    ...     "'birthdate': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
-
-    >>> sally = Person(name='Sally', kids=0,
-    ...             birthdate=datetime.date(1992,5,5))
-    >>> people.put(sally)
-    2
+    >>> print(person)
+    Person
+      name ................: 'Joe'
+      age .................: 20
+      kids ................: None
+      birthdate ...........: datetime.date(1992, 5, 5)
 
     """
-    x = """
-
-    >>> sally = people.find(name='Sally')
-    >>> repr(sally) == (
-    ...     "[<Person {'name': 'Sally', "
-    ...     "'kids': 0, 'birthdate': datetime.date(1992, 5, 5)}>]"
-    ... )
-    True
-
-    >>> sally = people.first(name='Sally')
-    >>> repr(sally) == (
-    ...     "<Person {'name': 'Sally', "
-    ...     "'kids': 0, 'birthdate': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
-
-    >>> sally.kids += 1
-    >>> people.put(sally)
-    2
-
-    >>> repr(people.first(name='Sally')) == (
-    ...     "<Person {'name': 'Sally', "
-    ...     "'kids': 1, 'birthdate': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
-
-    >>> sally = people.first(name='Sally')
-    >>> sally.kids += 1
-    >>> people.put(sally)
-    2
-
-    >>> repr(people.first(name='Sally')) == (
-    ...     "<Person {'name': 'Sally', "
-    ...     "'kids': 2, 'birthdate': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
-    >>> sally = people.first(name='Sally')
-    >>> sally.kids += 1
-    >>> people.put(sally)
-    2
-
-    >>> repr(people.first(name='Sally')) == (
-    ...     "<Person {'name': 'Sally', "
-    ...     "'kids': 3, 'birthdate': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
-
-
-    >>> class Account(Record): pass
-    >>> class Accounts(RecordStore): pass
-    >>> accounts = Accounts(db, Account, key='account_id')
-    >>> accounts.kind
-    'account'
-
-    >>> account = Account(name='Joe', added=datetime.date(1992,5,5))
-    >>> repr(account) == (
-    ...     "<Account {'name': 'Joe', 'added': datetime.date(1992, 5, 5)}>"
-    ... )
-    True
-    >>> id = accounts.put(account)
-    >>> id
-    1
-    >>> accounts.put(Account(name='Sam', added=datetime.date(2001,1,1)))
-    2
-    >>> accounts.put(Account(name='Sal', added=datetime.date(2001,1,1)))
-    3
-
-    >>> account = accounts.get(1)
-    >>> print(accounts)
-    account
-    account_id name added
-    ---------- ---- ----------
-                1 Joe  1992-05-05
-                2 Sam  2001-01-01
-                3 Sal  2001-01-01
-    3 account records
-
-    >>> print(accounts.first(name='Sam'))
-    Account
-        account_id ..........: 2
-        name ................: 'Sam'
-        added ...............: datetime.date(2001, 1, 1)
-
-    >>> print(accounts.find(added=datetime.date(2001, 1, 1)))
-    account
-    account_id name added
-    ---------- ---- ----------
-                2 Sam  2001-01-01
-                3 Sal  2001-01-01
-    2 account records
-
-    >>> accounts.delete(2)
-    [2]
-    >>> print(accounts)
-    account
-    account_id name added
-    ---------- ---- ----------
-                1 Joe  1992-05-05
-                3 Sal  2001-01-01
-    2 account records
-
-        """
 
     order_by = None
 
@@ -219,18 +115,18 @@ class RecordStore(Store):
         <Person {'name': 'Sally', 'age': 25}>
         >>> sally = people.get(id)
         >>> sally
-        <Person {'name': 'Sally', 'age': 25}>
+        <Person {'name': 'Sally', 'age': 25, 'kids': None, 'birthdate': None}>
         >>> sally.age = 35
         >>> people.put(sally)
         1
         >>> person = people.get(id)
         >>> person
-        <Person {'name': 'Sally', 'age': 35}>
+        <Person {'name': 'Sally', 'age': 35, 'kids': None, 'birthdate': None}>
         >>> id = people.put({'name':'James', 'age':15})
         >>> id
         2
         >>> people.get(id)
-        <Person {'name': 'James', 'age': 15}>
+        <Person {'name': 'James', 'age': 15, 'kids': None, 'birthdate': None}>
         """
 
         updating = self.id_name in record
@@ -302,25 +198,25 @@ class RecordStore(Store):
         >>> id = people.put(Person(**{'name': 'Sam', 'age':15}))
         >>> sam = people.get(id)
         >>> sam
-        <Person {'name': 'Sam', 'age': 15}>
+        <Person {'name': 'Sam', 'age': 15, 'kids': None, 'birthdate': None}>
         >>> people.put(Person(name='Jim',age=21))
         2
         >>> print(people)
         person
-        _id name age
-        --- ---- ---
-          1 Sam   15
-          2 Jim   21
+        _id name age kids birthdate
+        --- ---- --- ---- ---------
+          1 Sam   15 None None
+          2 Jim   21 None None
         2 person records
 
         >>> people.put(Person(name='Alice',age=29))
         3
         >>> print(people.get([1, 3]))
         person
-        _id name  age
-        --- ----- ---
-          1 Sam    15
-          3 Alice  29
+        _id name  age kids birthdate
+        --- ----- --- ---- ---------
+          1 Sam    15 None None
+          3 Alice  29 None None
         2 person records
 
         """
@@ -408,12 +304,12 @@ class RecordStore(Store):
         3
         >>> bool(joe)
         True
-        """
-        x="""
+
         >>> joe
-        <Person {'name': 'Joe', 'age': 25}>
+        <Person {'name': 'Joe', 'age': 25, 'kids': None, 'birthdate': None}>
         >>> people.delete(id)
         [3]
+
         >>> joe = people.get(id)
         >>> joe
         >>> bool(joe)
@@ -430,7 +326,6 @@ class RecordStore(Store):
         >>> bool(people.find(name='Sally'))
         False
 
-        >>> db.close()
         """
         ids = []
         for key in args:
@@ -454,7 +349,7 @@ class RecordStore(Store):
         1
         >>> sally = people.get(id)
         >>> sally
-        <Person {'name': 'Sally', 'age': 25}>
+        <Person {'name': 'Sally', 'age': 25, 'kids': None, 'birthdate': None}>
         >>> people.exists(1)
         True
         >>> people.exists(2)
@@ -492,12 +387,8 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Sally', age=25))
         >>> id = people.put(Person(name='Sam', age=25))
         >>> id = people.put(Person(name='Joe', age=25))
-        >>> repr(people.all()) == (
-        ...     "[<Person {'name': 'Sally', 'age': 25}>, "
-        ...     "<Person {'name': 'Sam', 'age': 25}>, "
-        ...     "<Person {'name': 'Joe', 'age': 25}>]"
-        ... )
-        True
+        >>> people.all()[0]
+        <Person {'name': 'Sally', 'age': 25, 'kids': None, 'birthdate': None}>
 
         """
         return RecordList(self)
@@ -513,12 +404,8 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Sally', age=25))
         >>> id = people.put(Person(name='Sam', age=25))
         >>> id = people.put(Person(name='Joe', age=25))
-        >>> repr(people.all()) == (
-        ...     "[<Person {'name': 'Sally', 'age': 25}>, "
-        ...     "<Person {'name': 'Sam', 'age': 25}>, "
-        ...     "<Person {'name': 'Joe', 'age': 25}>]"
-        ... )
-        True
+        >>> len(people.all())
+        3
 
         >>> people.zap()
         >>> people.all()
@@ -578,14 +465,14 @@ class RecordStore(Store):
 
         >>> print(people.find(age=25))
         person
-        _id name age
-        --- ---- ---
-          1 Sam   25
-          3 Bob   25
+        _id name age kids birthdate
+        --- ---- --- ---- ---------
+          1 Sam   25 None None
+          3 Bob   25 None None
         2 person records
 
         >>> people.find(name='Sam')
-        [<Person {'name': 'Sam', 'age': 25}>]
+        [<Person {'name': 'Sam', 'age': 25, 'kids': None, 'birthdate': None}>]
         >>> len(people.find(name='Sam'))
         1
 
@@ -610,7 +497,7 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Bob', age=25))
         >>> people.first(age=5)
         >>> people.first(age=25)
-        <Person {'name': 'Sam', 'age': 25}>
+        <Person {'name': 'Sam', 'age': 25, 'kids': None, 'birthdate': None}>
 
         """
         for item in self.find(**kwargs):
@@ -629,7 +516,7 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Bob', age=25))
         >>> people.last(age=5)
         >>> people.last(age=25)
-        <Person {'name': 'Bob', 'age': 25}>
+        <Person {'name': 'Bob', 'age': 25, 'kids': None, 'birthdate': None}>
 
         """
         rows = self._find(**kwargs)
@@ -649,17 +536,11 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Sally Mary Smith', age=55))
         >>> id = people.put(Person(name='Bob Marvin Smith', age=25))
 
-        >>> repr(list(people.search('smi'))) == (
-        ...     "[<Person {'name': 'Sally Mary Smith', 'age': 55}>, "
-        ...     "<Person {'name': 'Bob Marvin Smith', 'age': 25}>]"
-        ... )
-        True
-
         >>> list(people.search('bo smi'))
-        [<Person {'name': 'Bob Marvin Smith', 'age': 25}>]
+        [<Person {'name': 'Bob Marvin Smith', 'age': 25, 'kids': None, 'birthdate': None}>]
 
         >>> list(people.search('smi 55'))
-        [<Person {'name': 'Sally Mary Smith', 'age': 55}>]
+        [<Person {'name': 'Sally Mary Smith', 'age': 55, 'kids': None, 'birthdate': None}>]
 
         """
         def matches(item, terms):
@@ -687,12 +568,7 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Sally Mary Smith', age=55))
         >>> id = people.put(Person(name='Bob Marvin Smith', age=25))
         >>> list(people.filter(lambda a: 'Mary' in a.name))
-        [<Person {'name': 'Sally Mary Smith', 'age': 55}>]
-        >>> repr(list(people.filter(lambda a: a.age < 40))) == (
-        ...     "[<Person {'name': 'Sam Adam Jones', 'age': 25}>, "
-        ...     "<Person {'name': 'Bob Marvin Smith', 'age': 25}>]"
-        ... )
-        True
+        [<Person {'name': 'Sally Mary Smith', 'age': 55, 'kids': None, 'birthdate': None}>]
 
         """
         for rec in self:
@@ -710,7 +586,10 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Sam', age=25))
         >>> id = people.put(Person(name='Sally', age=55))
         >>> id = people.put(Person(name='Bob', age=25))
+        """
+        """
         >>> for rec in people: print(rec)
+
         Person
           name ................: 'Sam'
           age .................: 25
@@ -742,33 +621,31 @@ class RecordStore(Store):
         >>> id3 = people.put(Person(name='Bob', age=25))
 
         >>> people[0]
-        <Person {'name': 'Sam', 'age': 25}>
+        <Person {'name': 'Sam', 'age': 25, 'kids': None, 'birthdate': None}>
 
         >>> people[1]
-        <Person {'name': 'Sally', 'age': 55}>
+        <Person {'name': 'Sally', 'age': 55, 'kids': None, 'birthdate': None}>
 
         >>> people[-1]
-        <Person {'name': 'Bob', 'age': 25}>
+        <Person {'name': 'Bob', 'age': 25, 'kids': None, 'birthdate': None}>
 
         >>> people[0:2]
-        [<Person {'name': 'Sam', 'age': 25}>, <Person {'name': 'Sally', 'age': 55}>]
+        [<Person {'name': 'Sam', 'age': 25, 'kids': None, 'birthdate': None}>, <Person {'name': 'Sally', 'age': 55, 'kids': None, 'birthdate': None}>]
 
         >>> people[::2]
-        [<Person {'name': 'Sam', 'age': 25}>, <Person {'name': 'Bob', 'age': 25}>]
+        [<Person {'name': 'Sam', 'age': 25, 'kids': None, 'birthdate': None}>, <Person {'name': 'Bob', 'age': 25, 'kids': None, 'birthdate': None}>]
 
         >>> people[::-2]
-        [<Person {'name': 'Bob', 'age': 25}>, <Person {'name': 'Sam', 'age': 25}>]
+        [<Person {'name': 'Bob', 'age': 25, 'kids': None, 'birthdate': None}>, <Person {'name': 'Sam', 'age': 25, 'kids': None, 'birthdate': None}>]
 
         >>> people[1:-1]
-        [<Person {'name': 'Sally', 'age': 55}>]
+        [<Person {'name': 'Sally', 'age': 55, 'kids': None, 'birthdate': None}>]
 
         >>> try:
         ...     people[3]
         ... except IndexError as e:
         ...     print(e)
         Index (3) out of range
-
-        >>> db.close()
 
         """
         n = len(self)
@@ -809,11 +686,11 @@ class RecordStore(Store):
         >>> id = people.put(Person(name='Bob', age=25))
         >>> print(people)
         person
-        _id name  age
-        --- ----- ---
-          1 Sam    25
-          2 Sally  55
-          3 Bob    25
+        _id name  age kids birthdate
+        --- ----- --- ---- ---------
+          1 Sam    25 None None
+          2 Sally  55 None None
+          3 Bob    25 None None
         3 person records
 
         >>> people.zap()
@@ -844,7 +721,6 @@ class RecordStore(Store):
 
         """
         return '<RecordStore({})>'.format(self.record_class.__name__)
-        # return repr(self.all())
 
 
 def table_of(klass, db=None, name=None, key='id'):
