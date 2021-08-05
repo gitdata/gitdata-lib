@@ -4,10 +4,9 @@
     Test the gitdata.stores.records module
 """
 
-from datetime import date, time, datetime
+from datetime import datetime
 import unittest
 
-import gitdata
 from gitdata.stores.records import Record, RecordStore, table_of
 from gitdata.database import setup_test
 
