@@ -2,7 +2,7 @@
     gitdata config
 
     GitData looks for a configuration file named gitdata.ini to determine
-    it's working configuratino.  This file can be located in the current
+    it's working configuration.  This file can be located in the current
     directory or any parent directory of the current directory, or
     if it's not found there it can be located in the user home
     directory or any parent of that directory.
