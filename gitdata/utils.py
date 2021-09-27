@@ -13,6 +13,11 @@ import os
 logger = logging.getLogger(__name__)
 
 
+def new_uid():
+    """returns a unique id"""
+    return uuid.uuid4().hex
+
+
 def libpath(*args):
     """Returns the location of a standard gitdata-lib asset
 
