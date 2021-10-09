@@ -13,3 +13,4 @@ docs/_build
 build
 dist
 gitdata_lib.egg-info
+.env
