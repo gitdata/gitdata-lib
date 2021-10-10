@@ -310,7 +310,7 @@ class Database:
         del cls.stats[:len(result)]  # clear the list, but more may have been added
         return result
 
-    def get_tables(self):
+    def get_table_names(self):
         """get list of database tables"""
 
     @property

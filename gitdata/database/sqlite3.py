@@ -67,7 +67,7 @@ class Sqlite3Database(Database):
 
         Database.__init__(self, sqlite3.connect, *args, **keyword_args)
 
-    def get_tables(self):
+    def get_table_names(self):
         """return table names"""
         cmd = 'select name from sqlite_master where type="table"'
         return [a[0] for a in self(cmd)]

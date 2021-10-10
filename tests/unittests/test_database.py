@@ -64,7 +64,7 @@ class DatabaseTests:
 
     def test_db_create_drop_table(self):
         db = self.db
-        self.assert_('gitdata_test_table' not in db.get_tables())
+        self.assert_('gitdata_test_table' not in db.get_table_names())
         db("""
            create table gitdata_test_table (
              ID CHAR(10),
@@ -73,17 +73,17 @@ class DatabaseTests:
              NOTES TEXT
            )
         """)
-        self.assert_('gitdata_test_table' in db.get_tables())
+        self.assert_('gitdata_test_table' in db.get_table_names())
         db('drop table gitdata_test_table')
-        self.assert_('gitdata_test_table' not in db.get_tables())
+        self.assert_('gitdata_test_table' not in db.get_table_names())
 
-    def test_get_tables(self):
+    def test_get_table_names(self):
         db = self.db
         n = 10
         for i in range(n):
             table_name = 'gitdata_test_table{}'.format(i)
             db('drop table if exists ' + table_name)
-            self.assert_(table_name not in db.get_tables())
+            self.assert_(table_name not in db.get_table_names())
             db("""
                create table {} (
                  ID CHAR(10),
@@ -92,12 +92,12 @@ class DatabaseTests:
                  NOTES TEXT
                )
             """.format(table_name))
-            self.assert_(table_name in db.get_tables())
+            self.assert_(table_name in db.get_table_names())
 
         for i in range(n):
             table_name = 'gitdata_test_table{}'.format(i)
             db('drop table ' + table_name)
-            self.assert_(table_name not in db.get_tables())
+            self.assert_(table_name not in db.get_table_names())
 
     def test_db_insert_update_record(self):
         # pylint: disable=protected-access
@@ -442,7 +442,7 @@ class DatabaseTests:
 
     # def test_column_name_reserved(self):
     #     db = self.db
-    #     self.assertNotIn('z_test_table', db.get_tables())
+    #     self.assertNotIn('z_test_table', db.get_table_names())
     #     db("""
     #        create table z_test_table (
     #          `id` integer,
@@ -450,9 +450,9 @@ class DatabaseTests:
     #          `created` timestamp
     #        )
     #     """)
-    #     self.assertIn('z_test_table', db.get_tables())
+    #     self.assertIn('z_test_table', db.get_table_names())
     #     db('drop table z_test_table')
-    #     self.assertNotIn('z_test_table', db.get_tables())
+    #     self.assertNotIn('z_test_table', db.get_table_names())
 
 
 class TestSqlite3Database(unittest.TestCase, DatabaseTests):
@@ -496,16 +496,16 @@ class TestSqlite3Database(unittest.TestCase, DatabaseTests):
 
     # def test_create_site_tables(self):
     #     self.db.create_site_tables()
-    #     assert 'users' in self.db.get_tables()
+    #     assert 'users' in self.db.get_table_names()
 
     # def test_create_and_delete_test_tables(self):
     #     self.db.create_test_tables()
     #     try:
-    #         assert 'account' in self.db.get_tables()
+    #         assert 'account' in self.db.get_table_names()
     #     finally:
     #         self.db.create_test_tables()
     #     self.db.delete_test_tables()
-    #     assert 'account' not in self.db.get_tables()
+    #     assert 'account' not in self.db.get_table_names()
 
     def test_native_paramstyle(self):
         self.db.paramstyle = 'native'
@@ -705,11 +705,11 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 #         try:
 #             create_data(db2, 'z_test_table2')
 
-#             assert 'z_test_table1' in db1.get_tables()
-#             assert 'z_test_table2' not in db1.get_tables()
+#             assert 'z_test_table1' in db1.get_table_names()
+#             assert 'z_test_table2' not in db1.get_table_names()
 
-#             assert 'z_test_table1' not in db2.get_tables()
-#             assert 'z_test_table2' in db2.get_tables()
+#             assert 'z_test_table1' not in db2.get_table_names()
+#             assert 'z_test_table2' in db2.get_table_names()
 
 #             db1('drop table z_test_table1')
 #             db2('drop table z_test_table2')
@@ -718,22 +718,22 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 #             # in Travis this isn't needed but won't cause problems either
 #             db1('drop database if exists gitdatatest2')
 
-#     def test_get_databases(self):
+#     def test_get_database_names(self):
 #         db = self.db
 
-#         databases = db.get_databases()
+#         databases = db.get_database_names()
 #         assert 'gitdatatest' in databases
 
 #         # in Travis this is already done
 #         db('create database if not exists gitdatatest2')
 #         try:
 
-#             assert 'gitdatatest2' in db.get_databases()
+#             assert 'gitdatatest2' in db.get_database_names()
 
 #         finally:
 #             # in Travis this isn't needed but won't cause problems either
 #             db('drop database if exists gitdatatest2')
-#             assert 'gitdatatest2' not in db.get_databases()
+#             assert 'gitdatatest2' not in db.get_database_names()
 
 #     def test_create_and_delete_test_tables(self):
 #         # in Travis this is already done
@@ -742,19 +742,19 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 #         db = self.db.use('gitdatatest2')
 #         try:
 
-#             assert 'gitdatatest2' in db.get_databases()
+#             assert 'gitdatatest2' in db.get_database_names()
 #             db.create_test_tables()
 #             try:
-#                 assert 'account' in db.get_tables()
+#                 assert 'account' in db.get_table_names()
 #             finally:
 #                 db.delete_test_tables()
 
-#             assert 'account' not in db.get_tables()
+#             assert 'account' not in db.get_table_names()
 
 #         finally:
 #             # in Travis this isn't needed but won't cause problems either
 #             db('drop database if exists gitdatatest2')
-#             assert 'gitdatatest2' not in db.get_databases()
+#             assert 'gitdatatest2' not in db.get_database_names()
 
 #         stats = db.get_stats()
 #         assert isinstance(stats, list)
@@ -763,9 +763,9 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 #         root = os.path.dirname(__file__)
 #         join = os.path.join
 #         self.db.run(join(root, 'sql/mysql_run_test_start.sql'))
-#         assert 'run_test_table' in self.db.get_tables()
+#         assert 'run_test_table' in self.db.get_table_names()
 #         self.db.run(join(root, 'sql/mysql_run_test_finish.sql'))
-#         assert 'run_test_table' not in self.db.get_tables()
+#         assert 'run_test_table' not in self.db.get_table_names()
 
 #     def test_runs(self):
 #         root = os.path.dirname(__file__)
@@ -773,11 +773,11 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 
 #         start = gitdata.load(join(root, 'sql/mysql_run_test_start.sql'))
 #         self.db.runs(start)
-#         assert 'run_test_table' in self.db.get_tables()
+#         assert 'run_test_table' in self.db.get_table_names()
 
 #         finish = gitdata.load(join(root, 'sql/mysql_run_test_finish.sql'))
 #         self.db.runs(finish)
-#         assert 'run_test_table' not in self.db.get_tables()
+#         assert 'run_test_table' not in self.db.get_table_names()
 
 #     def test_runs_with_blank_lines(self):
 #         root = os.path.dirname(__file__)
@@ -791,7 +791,7 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 
 #         finish = gitdata.load(join(root, 'sql/mysql_run_test_finish.sql'))
 #         self.db.runs(finish)
-#         assert 'run_test_table' not in self.db.get_tables()
+#         assert 'run_test_table' not in self.db.get_table_names()
 
 #     def test_native_paramstyle(self):
 #         self.db.paramstyle = 'native'

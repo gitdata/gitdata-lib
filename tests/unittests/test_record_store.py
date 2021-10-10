@@ -224,7 +224,7 @@ class TestRecordStore(unittest.TestCase):
 
         # note: column is a reserved word
 
-        self.assertNotIn('z_test_table', db.get_tables())
+        self.assertNotIn('z_test_table', db.get_table_names())
         db("""
            create table z_test_table (
              `item` integer NOT NULL PRIMARY KEY autoincrement,
@@ -232,7 +232,7 @@ class TestRecordStore(unittest.TestCase):
              `created` timestamp
            )
         """)
-        self.assertIn('z_test_table', db.get_tables())
+        self.assertIn('z_test_table', db.get_table_names())
 
         table = table_of(dict, db=db, name='z_test_table', key='item')
 
@@ -247,7 +247,7 @@ class TestRecordStore(unittest.TestCase):
         self.assertIsNone(table.first(column='test'))
 
         db('drop table z_test_table')
-        self.assertNotIn('z_test_table', db.get_tables())
+        self.assertNotIn('z_test_table', db.get_table_names())
 
 
 class TestKeyedRecordStore(TestRecordStore):

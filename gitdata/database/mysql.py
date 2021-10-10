@@ -51,12 +51,12 @@ class MySQLDatabase(Database):
 
         Database.__init__(self, pymysql.connect, *args, **keyword_args)
 
-    def get_tables(self):
+    def get_table_names(self):
         """return table names"""
         cmd = 'show tables'
         return [a[0] for a in self(cmd)]
 
-    def get_databases(self):
+    def get_database_names(self):
         """return database names"""
         cmd = 'show databases'
         return [a[0] for a in self(cmd)]
