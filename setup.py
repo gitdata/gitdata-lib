@@ -24,6 +24,11 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/gitdata/gitdata-lib",
     packages=setuptools.find_packages(include=['gitdata*']),
+    entry_points={
+        'console_scripts': [
+            'gitdata = gitdata.cli:main'
+        ]
+    },
     install_requires=requires,
     classifiers=[
         'Development Status :: 1 - Planning',
