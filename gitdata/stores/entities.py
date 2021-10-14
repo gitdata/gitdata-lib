@@ -22,6 +22,7 @@
 import base64
 import datetime
 import decimal
+import os
 
 import gitdata
 import gitdata.utils
@@ -909,6 +910,13 @@ class EntityStore(Store):
 
         """
         return '<EntityStore({})>'.format(self.klass.__name__)
+
+
+def setup_entity_store(db):
+    """Creates the entity store tables"""
+    path = os.path.dirname(__file__)
+    pathname = os.path.realpath(os.path.join(path, 'entity_store.sql'))
+    db.run(pathname)
 
 
 def store_of(klass, db=None, name=None):
