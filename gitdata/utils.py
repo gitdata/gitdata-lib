@@ -8,6 +8,7 @@ import decimal
 import inspect
 import logging
 import os
+import uuid
 
 
 logger = logging.getLogger(__name__)
