@@ -61,7 +61,7 @@ def response_topic_name(topic, id):
 
 
 def setup_test():
-    db = gitdata.database.setup_test()
+    db = gitdata.database.setup_test_database()
     return Queues(db)
 
 

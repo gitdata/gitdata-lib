@@ -3,7 +3,7 @@
 """
 
 from .common import Database
-from .sqlite3 import Sqlite3Database, setup_test
+from .sqlite3 import Sqlite3Database, setup_test_database
 from .mysql import MySQLDatabase
 
 

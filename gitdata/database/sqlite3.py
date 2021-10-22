@@ -84,8 +84,11 @@ class Sqlite3Database(Database):
     def transaction(self):
         return Sqlite3DatabaseTransaction(self)
 
-def setup_test():
-    """Setup Test Database"""
+
+def setup_test_database():
+    """Setup Testing Database"""
     db = Sqlite3Database()
     db.run(gitdata.utils.libpath('database/sqlite3_setup_test_data.sql'))
     return db
+
+setup_test_database.__test__ = False

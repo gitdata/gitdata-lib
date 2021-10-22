@@ -8,7 +8,7 @@ from datetime import datetime
 import unittest
 
 from gitdata.stores.records import Record, RecordStore, table_of
-from gitdata.database import setup_test
+from gitdata.database import setup_test_database
 
 
 class Person(Record):
@@ -52,7 +52,7 @@ class TestRecordStore(unittest.TestCase):
         return table_of(Person, db=self.db)
 
     def setUp(self):
-        self.db = setup_test()
+        self.db = setup_test_database()
         self.create_tables(self.db)
 
         self.people = self.get_record_store()

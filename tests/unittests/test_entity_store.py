@@ -24,7 +24,7 @@ class TestPerson(Record):
 class TestStore(unittest.TestCase):
 
     def setUp(self):
-        self.db = gitdata.database.setup_test()
+        self.db = gitdata.database.setup_test_database()
         self.people = store_of(Person, db=self.db)
         self.joe_id = self.people.put(Person(name='Joe', age=50))
         self.sam_id = self.people.put(Person(name='Sam', age=25))
@@ -141,7 +141,7 @@ class TestStore(unittest.TestCase):
 class TestEntify(unittest.TestCase):
 
     def setUp(self):
-        self.db = gitdata.database.setup_test()
+        self.db = gitdata.database.setup_test_database()
         self.people = EntityStore(self.db, Person)
         self.joe_id = self.people.put(Person(name='Joe', age=50))
         self.sam_id = self.people.put(Person(name='Sam', age=25))
