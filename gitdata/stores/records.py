@@ -57,7 +57,7 @@ class Result(object):
 class RecordStore(Store):
     """stores records
 
-    >>> db = gitdata.database.setup_test()
+    >>> db = gitdata.database.setup_test_database()
 
     >>> class Person(Record): pass
     >>> class People(RecordStore): pass
@@ -101,7 +101,7 @@ class RecordStore(Store):
         """
         stores a record
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -191,7 +191,7 @@ class RecordStore(Store):
         """
         retrives records
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -255,7 +255,7 @@ class RecordStore(Store):
         """
         get complete set of attributes for the record type
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -292,7 +292,7 @@ class RecordStore(Store):
         """
         delete a record
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -340,7 +340,7 @@ class RecordStore(Store):
         """
         tests for existence of a record
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -380,7 +380,7 @@ class RecordStore(Store):
         """
         Retrieves all entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -397,7 +397,7 @@ class RecordStore(Store):
         """
         deletes all entities of the given kind
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -419,7 +419,7 @@ class RecordStore(Store):
         """
         returns number of entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -455,7 +455,7 @@ class RecordStore(Store):
         """
         finds entities that meet search criteria
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -488,7 +488,7 @@ class RecordStore(Store):
         """
         finds the first record that meet search criteria
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -507,7 +507,7 @@ class RecordStore(Store):
         """
         finds the last record that meet search criteria
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -528,7 +528,7 @@ class RecordStore(Store):
         """
         search for records that match text
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -560,7 +560,7 @@ class RecordStore(Store):
         """
         finds records that satisfiy filter
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -579,7 +579,7 @@ class RecordStore(Store):
         """
         interates through records
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -612,7 +612,7 @@ class RecordStore(Store):
         """
         return records or slices of records by position
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -677,7 +677,7 @@ class RecordStore(Store):
         """
         format for humans
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -704,7 +704,7 @@ class RecordStore(Store):
         """
         unabiguous representation
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(RecordStore): pass
         >>> people = People(db, Person)
@@ -733,7 +733,7 @@ def table_of(klass, db=None, name=None, key='id'):
 
     Uses the current database if none is provided.
 
-    >>> db = gitdata.database.setup_test()
+    >>> db = gitdata.database.setup_test_database()
 
     >>> people = table_of('person', db)
     >>> id = people.put(dict(name='Sam', age=20))

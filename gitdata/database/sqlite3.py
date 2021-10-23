@@ -91,4 +91,5 @@ def setup_test_database():
     db.run(gitdata.utils.libpath('database/sqlite3_setup_test_data.sql'))
     return db
 
+
 setup_test_database.__test__ = False

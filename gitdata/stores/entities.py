@@ -130,7 +130,7 @@ class Store(object):
 class EntityStore(Store):
     """stores entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
 
         >>> stuff = EntityStore(db)
         >>> stuff.put(dict(name='Joe', age=14))
@@ -154,7 +154,7 @@ class EntityStore(Store):
           3 Sam    34
         2 dict records
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -243,7 +243,7 @@ class EntityStore(Store):
         """
         stores an entity
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
 
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
@@ -359,7 +359,7 @@ class EntityStore(Store):
         """
         retrives entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
 
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
@@ -425,7 +425,7 @@ class EntityStore(Store):
         """
         get complete set of attributes for the entity type
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -471,7 +471,7 @@ class EntityStore(Store):
         """
         delete entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -519,7 +519,7 @@ class EntityStore(Store):
         """
         tests for existence of an entity
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -560,7 +560,7 @@ class EntityStore(Store):
         """
         Retrieves all entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -579,7 +579,7 @@ class EntityStore(Store):
         """
         deletes all entities of the given kind
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -603,7 +603,7 @@ class EntityStore(Store):
         """
         returns number of entities
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -651,7 +651,7 @@ class EntityStore(Store):
         """
         finds entities that meet search criteria
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -679,7 +679,7 @@ class EntityStore(Store):
         """
         finds the first entity that meet search criteria
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -705,7 +705,7 @@ class EntityStore(Store):
         """
         finds the last entity that meet search criteria
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -727,7 +727,7 @@ class EntityStore(Store):
         """
         search for entities that match text
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -760,7 +760,7 @@ class EntityStore(Store):
         """
         interates through records
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -787,7 +787,7 @@ class EntityStore(Store):
         """
         return entities or slices of entities by position
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -864,7 +864,7 @@ class EntityStore(Store):
         """
         format for humans
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -891,7 +891,7 @@ class EntityStore(Store):
         """
         unabiguous representation
 
-        >>> db = gitdata.database.setup_test()
+        >>> db = gitdata.database.setup_test_database()
         >>> class Person(Record): pass
         >>> class People(EntityStore): pass
         >>> people = People(db, Person)
@@ -929,7 +929,7 @@ def store_of(klass, db=None, name=None):
 
     Uses the current site database if none is provided.
 
-    >>> db = gitdata.database.setup_test()
+    >>> db = gitdata.database.setup_test_database()
 
     >>> class Person(Record): pass
     >>> people = store_of(Person, db=db)
