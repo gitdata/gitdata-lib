@@ -18,7 +18,7 @@ unittest:
   stage: test
   image: python:3.9
   services:
-    - postgresql:latest
+    - postgres:latest
   variables:
     POSTGRES_PASSWORD: password
   script:
