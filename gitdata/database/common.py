@@ -119,7 +119,6 @@ class Database:
         self.__connection = self.__factory(*self.__args, **self.__keywords)
         logger = logging.getLogger(__name__)
         logger.debug('opening %s', self.__class__.__name__)
-        return getattr(self.__connection, name)
 
     def translate(self, command, *args, many=False):
         """translate sql dialects
