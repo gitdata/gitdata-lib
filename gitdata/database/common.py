@@ -320,8 +320,27 @@ class Database:
         del cls.stats[:len(result)]  # clear the list, but more may have been added
         return result
 
+    @property
+    def database_names(self):
+        """Return list of database names"""
+        return self.get_database_names()
+
     def get_table_names(self):
         """get list of database tables"""
+
+
+    def get_schema_names(self):
+        """Return schema names"""
+        return []
+
+    @property
+    def schema_names(self):
+        return self.get_schema_names()
+
+    @property
+    def table_names(self):
+        """Return list of table names"""
+        return self.get_table_names()
 
     @property
     def database(self):
@@ -341,3 +360,13 @@ class Database:
         logger.debug('closing %s connection',
             self.__class__.__name__)
         self.close()
+
+    def get_connection(self):
+        return self.__connection
+
+    def get_args(self):
+        return self.__args
+
+    def get_kwargs(self):
+        return self.__keywords
+
