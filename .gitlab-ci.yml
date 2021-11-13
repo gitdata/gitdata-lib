@@ -2,7 +2,7 @@
 stages:
   - test
 
-unittest:
+mariadb:
   stage: test
   image: python:3.9
   services:
@@ -14,13 +14,14 @@ unittest:
     - source tests/setup_container.sh
     - nosetests --with-doctest --with-coverage --cover-package=gitdata -vx gitdata/utils.py tests/unittests
 
-unittest:
+postgres:
   stage: test
   image: python:3.9
   services:
     - postgres:latest
   variables:
     POSTGRES_PASSWORD: password
+    GITDATA_TEST_DATABASE_HOST: postgres
   script:
     - pip install .
     - pip install -r tests/requirements.txt
