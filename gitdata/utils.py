@@ -481,6 +481,8 @@ class ItemList(list):
         def nvl(value):
             if value is None:
                 return 'None'
+            elif isinstance(value, str):
+                return value.strip()
             return value
 
         if len(self) == 0:
