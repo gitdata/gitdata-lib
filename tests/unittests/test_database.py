@@ -2,10 +2,10 @@
     Test the gitdata database module
 """
 
+# pylint: disable=too-many-public-methods
 # pylint: disable=missing-docstring
-# method names are more useful for testing
-
 # pylint: disable=invalid-name
+# pylint: disable=no-member
 
 # import configparser
 # import os
@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 class DatabaseTests:
     """test db module"""
 
-    # pylint: disable=too-many-public-methods
     # It's reasonable in this case.
     def tearDown(self):
         self.db('drop table if exists gitdata_test_table')
@@ -50,13 +49,37 @@ class DatabaseTests:
         print(result)
         self.assertEqual(expected, result)
 
+    def test_output(self):
+        self.assertQueryResult(
+            """
+            id amount salary notes
+            -- ------ ------ -------
+             1   10.2     50 notes 1
+             2   30.2     75 notes 2
+             3   40.1     20 notes 3
+            """,
+            'select * from test_table'
+        )
+
     def test_RecordSet(self):
         db = self.db
-        db("""create table gitdata_test_table (ID CHAR(10), AMOUNT
-           NUMERIC(10,2),DTADD DATE,NOTES TEXT)""")
-        db("""insert into gitdata_test_table values  ("1234",50,"2005-01-14","Hello there")""")
-        db("""insert into gitdata_test_table values ("5678",60,"2035-01-24","New
-           notes")""")
+        db("""
+            create table gitdata_test_table (
+                ID CHAR(10),
+                AMOUNT NUMERIC(10,2),
+                DTADD DATE,NOTES TEXT
+            )
+        """)
+        db("""
+            insert into gitdata_test_table values (
+                1234, 50,'2005-01-14', 'Hello there'
+            )
+        """)
+        db("""
+            insert into gitdata_test_table values (
+                5678, 60,'2035-01-24', 'New notes'
+            )
+        """)
         recordset = db('select * from gitdata_test_table')
         for rec in recordset:
             self.assertEquals(rec, ("1234", 50, date(2005,1,14), "Hello there"))
@@ -66,11 +89,11 @@ class DatabaseTests:
         db = self.db
         self.assert_('gitdata_test_table' not in db.get_table_names())
         db("""
-           create table gitdata_test_table (
-             ID CHAR(10),
-             AMOUNT NUMERIC(10,2),
-             DTADD DATE,
-             NOTES TEXT
+            create table gitdata_test_table (
+                ID CHAR(10),
+                AMOUNT NUMERIC(10,2),
+                DTADD DATE,
+                NOTES TEXT
            )
         """)
         self.assert_('gitdata_test_table' in db.get_table_names())
@@ -559,6 +582,157 @@ class TestSqlite3Database(unittest.TestCase, DatabaseTests):
         )
 
 
+class TestPostgreSQLDatabase(unittest.TestCase, DatabaseTests):
+
+    def setUp(self):
+        get = os.environ.get
+
+        def create_database(name):
+            if name in self.db.database_names:
+                self.db(f'drop database {name}')
+            self.db(f'create database {name}')
+
+        self.db = db = connect(
+            'postgresql',
+            host=get('GITDATA_TEST_DATABASE_HOST', 'localhost'),
+            user=get('GITDATA_TEST_DATABASE_USER', 'postgres'),
+            password=get('GITDATA_TEST_DATABASE_PASSWORD', 'password'),
+        )
+
+        db.connect()
+        db.get_connection().autocommit = True
+        db('drop database if exists gitdatatest')
+        create_database('gitdatatest')
+        create_database('gitdatatest2')
+
+        cmd = """
+        create table test_table2 (
+            name varchar(20),
+            size int
+        ); commit;
+        """
+        db2 = self.db.use('gitdatatest2')
+        db2(cmd)
+
+        self.create_cmd = """
+            create table test_table
+            (
+                id char(10),
+                amount numeric(10,1),
+                salary decimal(10,0),
+                notes text
+            )
+        """
+        self.create_indexed_cmd = """
+            create table dz_test_contacts (
+                contactid integer PRIMARY KEY AUTO_INCREMENT,
+                userid char(20),
+                password char(16),
+                email char(60)
+            )
+        """
+        self.db('drop table if exists test_table')
+        self.db(self.create_cmd)
+
+        self.db('drop table if exists gitdata_test_table')
+        self.db('drop table if exists test_table')
+        self.db("""
+            create table test_table
+            (
+                id char(10),
+                amount numeric(10,1),
+                salary decimal(10,0),
+                notes text
+            )
+        """)
+        self.db.execute_many(
+            'insert into test_table values (%s, %s, %s, %s)', [
+                [1, 10.20, '50.00', 'notes 1'],
+                [2, 30.20, '75.00', 'notes 2'],
+                [3, 40.10, '20.00', 'notes 3'],
+            ]
+        )
+
+        self.create_cmd2 = """
+            create table test_table
+            (
+                id char(10),
+                amount numeric(10,1),
+                salary decimal(10,0),
+                notes text
+            )
+        """
+
+    def tearDown(self):
+        self.db('drop database gitdatatest2')
+        self.db('drop database gitdatatest')
+        self.db.close()
+        print(self.db.report())
+
+    @unittest.skip
+    def test_RecordSet(self):
+        pass
+
+    @unittest.skip
+    def test_date_type(self):
+        pass
+
+    @unittest.skip
+    def test_decimal_type(self):
+        pass
+
+    @unittest.skip
+    def test_last_rowid(self):
+        pass
+
+    @unittest.skip
+    def test_metadata(self):
+        pass
+
+    @unittest.skip
+    def test_record(self):
+        pass
+
+    @unittest.skip
+    def test_standardized_paramstyle(self):
+        pass
+
+    def otest_something(self):
+        print(self.db('select * from test_table'))
+        self.test_execute_many_from_empty_list_of_tuples()
+
+    def test_table_names(self):
+        db1 = self.db
+        self.assertIn(
+            'test_table',
+            self.db.table_names,
+        )
+
+    def test_use(self):
+        db1 = self.db
+        db2 = self.db.use('gitdatatest2')
+        self.assertNotIn(
+            'test_table2',
+            self.db.table_names,
+        )
+        self.assertIn(
+            'test_table2',
+            db2.table_names,
+        )
+
+    def test_connect(self):
+        self.assertIn(
+            'postgres',
+            self.db.get_database_names(),
+        )
+
+    def test_get_table_names(self):
+        self.assertIn(
+            'test_table',
+            self.db.get_table_names(),
+        )
+
+
 class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 
     def setUp(self):
@@ -914,4 +1088,5 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 #             ('select * from test_table where notes like "%1" and amount > ?', (50,)),
 #             'select * from test_table where notes like "%%1" and amount > %s', 50
 #         )
+
 

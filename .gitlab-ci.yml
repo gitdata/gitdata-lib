@@ -13,3 +13,15 @@ unittest:
   script:
     - source tests/setup_container.sh
     - nosetests --with-doctest --with-coverage --cover-package=gitdata -vx gitdata/utils.py tests/unittests
+
+unittest:
+  stage: test
+  image: python:3.9
+  services:
+    - postgresql:latest
+  variables:
+    POSTGRES_PASSWORD: password
+  script:
+    - pip install .
+    - pip install -r tests/requirements.txt
+    - nosetests -vx tests/unittests/test_database.py:TestPostgreSQLDatabase
