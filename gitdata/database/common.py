@@ -290,11 +290,18 @@ class Database:
             logger.error(msg)
             raise DatabaseException(msg)
 
+    def _use(self, **kwargs):
+        params = dict(
+            self.__keywords, **kwargs
+        )
+        return type(self)(*self.__args, **params)
+
     def use(self, name):
         """use another database on the same instance"""
-        args = list(self.__args)
-        keywords = dict(self.__keywords, db=name)
-        return type(self)(*args, **keywords)
+        return self._use(db=name)
+        # args = list(self.__args)
+        # keywords = dict(self.__keywords, db=name)
+        # return type(self)(*args, **keywords)
 
     def report(self):   # pragma: no cover
         """produce a SQL log report"""
