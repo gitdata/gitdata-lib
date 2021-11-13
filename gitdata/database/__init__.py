@@ -5,6 +5,7 @@
 from .common import Database
 from .sqlite3 import Sqlite3Database, setup_test_database
 from .mysql import MySQLDatabase
+from .postgresql import PostgreSQLDatabase
 
 
 class UnknownDatabaseException(Exception):
@@ -65,6 +66,9 @@ def connect(engine='sqlite3', **kwargs):
         db = MySQLDatabase(**kwargs)
         db.autocommit(1)
         return db
+
+    elif engine == 'postgresql':
+        return PostgreSQLDatabase(**kwargs)
 
     else:
         raise UnknownDatabaseException
