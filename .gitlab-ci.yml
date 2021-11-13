@@ -2,6 +2,21 @@
 stages:
   - test
 
+before_script:
+    - pip install .
+    - pip install -r tests/requirements.txt
+
+general:
+  stage: test
+  image: python:3.9
+  services:
+    - postgres:latest
+  variables:
+    POSTGRES_PASSWORD: password
+    GITDATA_TEST_DATABASE_HOST: postgres
+  script:
+    - nosetests --with-doctest --with-coverage --cover-package=gitdata -vx gitdata/utils.py
+
 mariadb:
   stage: test
   image: python:3.9
@@ -10,9 +25,11 @@ mariadb:
   variables:
     MYSQL_DATABASE: gitdatatest
     MYSQL_ROOT_PASSWORD: root
+    GITDATA_TEST_DATABASE_HOST: mariadb
+    GITDATA_TEST_DATABASE_USER: root
+    GITDATA_TEST_DATABASE_PASSWORD: root
   script:
-    - source tests/setup_container.sh
-    - nosetests --with-doctest --with-coverage --cover-package=gitdata -vx gitdata/utils.py tests/unittests
+    - nosetests -vx tests/unittests/test_database.py:TestMySQLDatabase
 
 postgres:
   stage: test
@@ -23,6 +40,4 @@ postgres:
     POSTGRES_PASSWORD: password
     GITDATA_TEST_DATABASE_HOST: postgres
   script:
-    - pip install .
-    - pip install -r tests/requirements.txt
     - nosetests -vx tests/unittests/test_database.py:TestPostgreSQLDatabase
