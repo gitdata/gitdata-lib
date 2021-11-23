@@ -641,7 +641,7 @@ class RecordList(list):
         """
 
         def visible(name):
-            hidden = getattr(self[0], 'hidden') or [] if self != [] else []
+            hidden = getattr(self[0], 'hidden', None) or [] if self != [] else []
             return not name.startswith('__') and not name in hidden
 
         if not bool(self):
