@@ -204,6 +204,8 @@ class Database:
                 return arg[:50] + '[{:,} chars]'.format(len(arg) - 100) + arg[-50:]
             elif isinstance(arg, bytes):
                 return '[{:,} bytes]'.format(len(arg))
+            elif isinstance(arg, tuple):
+                return tuple(map(format_arg, arg))
             else:
                 return arg
 

@@ -627,6 +627,30 @@ class TestSqlite3Database(unittest.TestCase, DatabaseTests):
   message: near "whoops": syntax error
 """)
 
+    def test_exception_with_tuple(self):
+        db = self.db
+        db('create table blobs (id integer, data blob)')
+        self.assertRaises(
+            DatabaseException,
+            db,
+            'insert into blobs values whoops (%s, %s)',
+            [(1, b'blob1'), (2, b'blob2')]
+        )
+        try:
+            db(
+                'insert into blobs values whoops (%s, %s)',
+                (1, b'blob1'), (2, b'blob2')
+            )
+        except DatabaseException as e:
+            self.assertEqual(str(e),
+            """
+  statement: 'insert into blobs values whoops (?, ?)'
+  parameters: [(1, '[5 bytes]'), (2, '[5 bytes]')]
+  message: near "whoops": syntax error
+""")
+
+
+
 class TestPostgreSQLDatabase(unittest.TestCase, DatabaseTests):
 
     def setUp(self):
