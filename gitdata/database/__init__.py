@@ -2,7 +2,7 @@
     gitdata database
 """
 
-from .common import Database
+from .common import Database, DatabaseException
 from .sqlite3 import Sqlite3Database, setup_test_database
 from .mysql import MySQLDatabase
 from .postgresql import PostgreSQLDatabase

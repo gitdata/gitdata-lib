@@ -20,7 +20,7 @@ import gitdata
 from gitdata.database import (
     connect,
     # connect_database,
-    # DatabaseException,
+    DatabaseException,
     # UnknownDatabaseException,
 )
 
@@ -798,9 +798,9 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
         new = self.db.translate('select * from test_table where amount=%(n)s', dict(n=50))
         self.assertEqual(new, ('select * from test_table where amount=:n', {'n': 50}))
 
-#     def test_exception(self):
-#         db = self.db
-#         self.assertRaises(DatabaseException, db, 'select things')
+    def test_exception(self):
+        db = self.db
+        self.assertRaises(DatabaseException, db, 'select things')
 
 #     def test_connect_database(self):
 #         get = os.environ.get
