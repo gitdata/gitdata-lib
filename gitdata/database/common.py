@@ -132,7 +132,7 @@ class Database:
         """
         def issequenceform(obj):
             """test for a sequence type that is not a string"""
-            if isinstance(obj, str):
+            if isinstance(obj, (str, bytes)):
                 return False
             return isinstance(obj, collections.Sequence)
 
@@ -199,13 +199,27 @@ class Database:
                 ) for rec in stack[m:n])
             )
 
+        def format_arg(arg):
+            if isinstance(arg, str) and len(arg) > 100:
+                return arg[:50] + '[{:,} chars]'.format(len(arg) - 100) + arg[-50:]
+            elif isinstance(arg, bytes):
+                return '[{:,} bytes]'.format(len(arg))
+            else:
+                return arg
+
         start = timeit.default_timer()
         many = method == cursor.executemany
         command, params = self.translate(command, *args, many=many)
         try:
             method(command, params)
         except Exception as error:
-            raise DatabaseException(ERROR_TPL.format(command, args, error)) from error
+            raise DatabaseException(
+                ERROR_TPL.format(
+                    command,
+                    list(map(format_arg, args)),
+                    error
+                )
+            ) from error
         else:
             self.rowcount = cursor.rowcount
         finally:

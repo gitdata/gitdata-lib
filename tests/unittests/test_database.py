@@ -581,6 +581,51 @@ class TestSqlite3Database(unittest.TestCase, DatabaseTests):
             'select * from test_table where notes like "%2" and amount > ?', 20
         )
 
+    def test_exception(self):
+        db = self.db
+        self.assertRaises(DatabaseException, db, 'select things')
+
+    def test_exception_with_binary(self):
+        db = self.db
+        db('create table blobs (id integer, data blob)')
+        db('insert into blobs values (1, %s)', 'blob1')
+        self.assertRaises(
+            DatabaseException,
+            db,
+            'insert into blobs values whoops (1, %s)',
+            b'blob1'
+        )
+        try:
+            db('insert into blobs values whoops (1, %s)', b'blob1')
+        except DatabaseException as e:
+            self.assertEqual(str(e),
+            """
+  statement: 'insert into blobs values whoops (1, ?)'
+  parameters: ['[5 bytes]']
+  message: near "whoops": syntax error
+""")
+
+    def test_exception_long_parameter(self):
+        db = self.db
+        db('create table blobs (id integer, data blob)')
+        self.assertRaises(
+            DatabaseException,
+            db,
+            'insert into blobs values whoops (1, %s)',
+            '*' * 101
+        )
+        try:
+            db(
+                'insert into blobs values whoops (1, %s)',
+                '*' * 101
+            )
+        except DatabaseException as e:
+            self.assertEqual(str(e),
+            """
+  statement: 'insert into blobs values whoops (1, ?)'
+  parameters: ['**************************************************[1 chars]**************************************************']
+  message: near "whoops": syntax error
+""")
 
 class TestPostgreSQLDatabase(unittest.TestCase, DatabaseTests):
 
@@ -797,10 +842,6 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
         self.db.paramstyle = 'qmark'
         new = self.db.translate('select * from test_table where amount=%(n)s', dict(n=50))
         self.assertEqual(new, ('select * from test_table where amount=:n', {'n': 50}))
-
-    def test_exception(self):
-        db = self.db
-        self.assertRaises(DatabaseException, db, 'select things')
 
 #     def test_connect_database(self):
 #         get = os.environ.get
