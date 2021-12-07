@@ -7,7 +7,7 @@
 from datetime import datetime
 import unittest
 
-from gitdata.stores.records import Record, RecordStore, table_of
+from gitdata.stores.tables import Record, RecordStore, table_of
 from gitdata.database import setup_test_database
 
 
