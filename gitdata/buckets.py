@@ -6,7 +6,7 @@
 
 import os
 import uuid
-
+import gitdata
 
 
 def mkdir_p(path):
@@ -18,10 +18,6 @@ def mkdir_p(path):
     if not os.path.isdir(path):
         os.makedirs(path)
 
-
-def new_id():
-    """Generate a random unique id"""
-    return uuid.uuid4().hex
 
 class BaseBucket:
     """BaseBucket"""
@@ -85,7 +81,7 @@ class FileBucket(BaseBucket):
 
     """
 
-    def __init__(self, path, id_factory=new_id):
+    def __init__(self, path, id_factory=gitdata.utils.new_uid):
         self.path = os.path.realpath(path)
         self.id_factory = id_factory
         mkdir_p(self.path)
