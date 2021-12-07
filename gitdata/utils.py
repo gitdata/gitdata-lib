@@ -8,15 +8,72 @@ import decimal
 import inspect
 import logging
 import os
+import string
 import uuid
 
 
 logger = logging.getLogger(__name__)
 
+chars = ''.join(map(chr, range(256)))
+keep_these = string.ascii_letters + string.digits + '-_ '
+delete_these = chars.translate(str.maketrans(chars, chars, keep_these))
+allowed = str.maketrans(keep_these, keep_these, delete_these)
+
 
 def new_uid():
     """returns a unique id"""
     return uuid.uuid4().hex
+
+
+def id_for(*args):
+    """Calculates a valid hyphenated id given an arbitrary string.
+
+    >>> id_for('Test 123')
+    'test-123'
+    >>> id_for('New Record')
+    'new-record'
+    >>> id_for('New "special" Record')
+    'new-special-record'
+    >>> id_for("hi", "test")
+    'hi~test'
+    >>> id_for("hi test")
+    'hi-test'
+    >>> id_for("hi-test")
+    'hi-test'
+    >>> id_for(1234)
+    '1234'
+    >>> id_for('this %$&#@^is##-$&*!it')
+    'this-is-it'
+    >>> id_for('test-this')
+    'test-this'
+    """
+    def id_(text):
+        return str(text).strip().translate(allowed).lower().replace(' ', '-')
+
+    return '~'.join([id_(arg) for arg in args])
+
+
+def name_for(text):
+    """Calculates a valid underscored name given an arbitrary string.
+
+    >>> name_for('Test 123')
+    'test_123'
+    >>> name_for('New Record')
+    'new_record'
+    >>> name_for('New "special" Record')
+    'new_special_record'
+    >>> name_for("hi test")
+    'hi_test'
+    >>> name_for("hi-test")
+    'hi_test'
+    >>> name_for(1234)
+    '1234'
+    >>> name_for('this %$&#@^is##-$&*!it')
+    'this_is_it'
+    >>> name_for('test-this')
+    'test_this'
+    """
+    return id_for(text).replace('-', '_')
 
 
 def libpath(*args):
