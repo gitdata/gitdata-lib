@@ -45,6 +45,5 @@ setuptools.setup(
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Database :: Front-Ends',
    ],
-   package_data={
-   }
+   include_package_data=True,
 )
