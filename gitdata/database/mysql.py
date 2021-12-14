@@ -3,6 +3,7 @@
 """
 
 import logging
+import os
 import pymysql
 
 from ..utils import obfuscate
@@ -50,6 +51,11 @@ class MySQLDatabase(Database):
         )
 
         Database.__init__(self, pymysql.connect, *args, **keyword_args)
+
+    def setup(self):
+        path = os.path.dirname(__file__)
+        pathname = os.path.realpath(os.path.join(path, 'mysql_setup.sql'))
+        self.run(pathname)
 
     def get_table_names(self):
         """return table names"""

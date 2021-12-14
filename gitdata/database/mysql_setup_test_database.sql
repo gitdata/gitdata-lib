@@ -9,5 +9,3 @@ create database if not exists gitdatatest;
 
 create user testuser identified by 'password';
 grant all on gitdatatest.* to testuser@'%';
-
-
