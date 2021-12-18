@@ -1,3 +1,4 @@
 include README.md LICENSE CHANGELOG.md requirements.txt
 recursive-include gitdata *.py *.html *.pug *.sass *.sql *.ini *.js *.css *.gitinclude *.md *.json *.wsgi *.eot *.svg *.ttf *.woff *.woff2 *.png *.ico *.map *.gif LICENSE
-recursive-exclude gitdata/ext *
+recursive-exclude gitdata/ext *.py
+recursive-include gitdata/ext __init__.py

@@ -2,4 +2,4 @@
     connectors
 """
 
-from .common import explore, connect
+from .common import explore, connect, fetch
