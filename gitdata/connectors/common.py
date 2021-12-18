@@ -2,12 +2,16 @@
     common connector
 """
 
+import datetime
+import getpass
 import inspect
 import importlib
 import logging
 import pkgutil
+import platform
 
 import gitdata.connectors
+import gitdata.ext.connectors
 import gitdata.solutions
 
 
@@ -17,6 +21,7 @@ logger = logging.getLogger(__name__)
 def get_connectors():
     """generate connectors"""
     path = gitdata.connectors.__path__
+
     for _, name, _ in pkgutil.iter_modules(path):
         if name != 'common':
             module = importlib.import_module('gitdata.connectors.' + name)
@@ -29,6 +34,19 @@ def get_connectors():
                     found = False
                 if found:
                     yield obj
+
+    path = gitdata.ext.connectors.__path__
+    for _, name, _ in pkgutil.iter_modules(path):
+        module = importlib.import_module('gitdata.ext.connectors.' + name)
+        for _, obj in inspect.getmembers(module):
+            if obj == BaseConnector:
+                continue
+            try:
+                found = issubclass(obj, BaseConnector)
+            except TypeError:
+                found = False
+            if found:
+                yield obj
 
 
 def get_connector_graph():
@@ -126,3 +144,26 @@ def connect(ref):
 
     # if 'System' in connectors:
     #     return connectors['System']()
+
+def add_connection_metadata(facts):
+    facts.update(
+        dict(
+            pulled=datetime.datetime.now(),
+            node=platform.node(),
+            user=getpass.getuser()
+        )
+    )
+
+
+def fetch(ref):
+    """Fetch data
+
+    Fetch the facts in a datasource and store them.
+    """
+    connectors = get_connectors()
+    for connector in connectors:
+        if hasattr(connector, 'get'):
+            facts = connector().get(ref)
+            if facts:
+                add_connection_metadata(facts)
+                return facts
