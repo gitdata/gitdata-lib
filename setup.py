@@ -23,7 +23,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/gitdata/gitdata-lib",
-    packages=setuptools.find_packages(include=['gitdata*']),
+    packages=setuptools.find_packages(include=['gitdata*'], exclude=("gitdata.ext.*",)),
     entry_points={
         'console_scripts': [
             'gitdata = gitdata.cli:main'
