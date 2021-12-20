@@ -25,6 +25,27 @@ def new_uid():
     return uuid.uuid4().hex
 
 
+def test_uid_maker(start=0):
+    """return a simple uid generator for testing
+
+    Returns a simple uid generator that with a given integer
+    and increments by one each time its called which allows
+    predictable uid values for testing.
+
+    >>> id_maker = test_uid_maker(4)
+    >>> id_maker()
+    '5'
+    >>> id_maker()
+    '6'
+
+    """
+    n = [start]
+    def _new_id():
+        n[0] += 1
+        return str(n[0])
+    return _new_id
+
+
 def id_for(*args):
     """Calculates a valid hyphenated id given an arbitrary string.
 
