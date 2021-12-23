@@ -59,38 +59,17 @@ class Undigester(object):
             else:
                 data.setdefault(s, {})[p] = o
 
-        print('data is', data)
-
         result = data.copy()
+
         for k, v in data.items():
             if isinstance(v, list):
                 result[k] = [result.pop(i, i) for i in v]
 
-        print('result: ', result)
         for k, v in result.items():
             if isinstance(v, dict):
                 for p, o in v.items():
-                    print('p:', p, 'o:', o)
                     if o in result:
-                        print('replace', v[p], 'with', result[o])
-                        v[o] = result.pop(o)
-                # print('v:', v)
-                # for p, o in v.items():
-                #     v[p] = v.pop(o, o)
-
-            # print(k, v)
-            # if v in result:
-                # result[k] = result.pop(v)
-            # if isinstance(v, list):
-            #     result[k] = [result.pop(i, i) for i in v]
-
-            # else:
-            #     for p, o in v.items():
-            #         v[p] = result.pop(o, o)
-            #         # print(p, o)
-            #     # result[k]
-            #     print('v is', v, 'k is ', k)
-            #     # result[k] = v
+                        v[p] = result.get(o)
 
         return result
 
