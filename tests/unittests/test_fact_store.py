@@ -308,6 +308,8 @@ class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
     def setUp(self):
         # path = tempfile.TemporaryDirectory().name
         path = 'tmp'
+        if not os.path.exists(path):
+            os.mkdir(path)
         pathname = os.path.join(path, '.gitdata')
         self.store = gitdata.stores.facts.Sqlite3FactStore(pathname)
         self.store.setup()
