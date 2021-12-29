@@ -4,6 +4,7 @@
     stores blobs of data
 """
 
+import io
 import os
 import shutil
 
@@ -150,6 +151,55 @@ class FileBucket(BaseBucket):
     def keys(self):
         return os.listdir(self.path)
 
+    def clear(self):
+        for key in self.keys():
+            self.delete(key)
+
+
+class MemoryBucket(BaseBucket):
+    """Memory Bucket
+
+    Memory based bucket.
+    """
+
+    def __init__(self, id_factory=gitdata.utils.new_uid):
+        self.id_factory = id_factory
+        self.items = {}
+
+    def put(self, item):
+        item_id = self.id_factory()
+        if item_id in self.items:
+            raise Exception('duplicate item')
+        self.items[item_id] = item
+        return item_id
+
+    def get(self, item_id, default=None):
+        value = self.items.get(item_id, default)
+        return value
+
+    def puts(self, item):
+        item_id = self.id_factory()
+        if item_id in self.items:
+            raise Exception('duplicate item')
+        self.items[item_id] = item.read()
+        return item_id
+
+    def gets(self, item_id, default=None):
+        value = self.items.get(item_id)
+        return io.BytesIO(value) if value else default
+        # return io.BytesIO(self.items.get(item_id, default))
+
+    def delete(self, item_id):
+        self.items.pop(item_id)
+
+    def exists(self, item_id):
+        return item_id in self.items
+
+    def keys(self):
+        return list(self.items.keys())
+
+    def clear(self):
+        self.items.clear()
+
 
 Bucket = FileBucket
-
