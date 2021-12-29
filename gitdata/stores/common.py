@@ -12,22 +12,25 @@ def retype(value, value_type):
     if value_type == 'str':
         pass
 
-    elif value_type == "int":
+    elif value_type == 'int':
         value = int(value)
 
     elif value_type == 'float':
         value = float(value)
 
-    elif value_type == 'decimal.Decimal':
+    elif value_type in ['_io.BytesIO', 'stream']:
+        pass
+
+    elif value_type in ['decimal', 'decimal.Decimal']:
         value = Decimal(value)
 
-    elif value_type == "datetime.date":
+    elif value_type in ['date', 'datetime.date']:
         y = int(value[:4])
         m = int(value[5:7])
         d = int(value[8:10])
         value = date(y, m, d)
 
-    elif value_type == "datetime.datetime":
+    elif value_type in ['datetime', 'datetime.datetime']:
         y = int(value[:4])
         m = int(value[5:7])
         d = int(value[8:10])
@@ -116,8 +119,8 @@ def get_type_str(value):
         return t
 
 
-class AbstractStore(object):
-    """Abstract Entity Store"""
+class AbstractStore:
+    """Abstract Fact Store"""
 
     def add(self, facts):
         """add facts to the entity store"""
