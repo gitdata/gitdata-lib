@@ -5,7 +5,8 @@
 """
 
 import os
-import uuid
+import shutil
+
 import gitdata
 
 
@@ -26,7 +27,7 @@ class BaseBucket:
 class FileBucket(BaseBucket):
     """File Bucket
 
-    FileBucket can store and retreive blobs of binary data.  This is
+    FileBucket can store and retrieve blobs of binary data.  This is
     useful for storing images or files as attachments where you want
     to put the binary data somewhere and be able to retreive it later
     if asked.  The id returned is generally stored in a database or
@@ -79,6 +80,19 @@ class FileBucket(BaseBucket):
     >>> for item_id in bucket.keys():
     ...     bucket.delete(item_id)
 
+    >>> bucket = FileBucket(path, new_id)
+    >>> item_id = bucket.puts(io.BytesIO(b'some data'))
+    >>> item_id
+    'id_0004'
+    >>> s = bucket.gets(item_id)
+    >>> s.read()
+    b'some data'
+    >>> s.close()
+    >>> bucket.exists(item_id)
+    True
+    >>> bucket.delete(item_id)
+    >>> bucket.exists(item_id)
+    False
     """
 
     def __init__(self, path, id_factory=gitdata.utils.new_uid):
@@ -91,7 +105,7 @@ class FileBucket(BaseBucket):
         pathname = os.path.join(self.path, item_id)
         if os.path.exists(pathname):
             raise Exception('duplicate item')
-        f = open(os.path.join(pathname), 'wb')
+        f = open(pathname, 'wb')
         try:
             f.write(item)
         finally:
@@ -104,6 +118,26 @@ class FileBucket(BaseBucket):
             return default
         with open(os.path.join(pathname), 'rb') as f:
             return f.read()
+
+    def puts(self, item):
+        item_id = self.id_factory()
+        pathname = os.path.join(self.path, item_id)
+        if os.path.exists(pathname):
+            raise Exception('duplicate item')
+        f = open(pathname, 'wb')
+        try:
+            shutil.copyfileobj(item, f)
+        finally:
+            f.close()
+        return item_id
+
+    def gets(self, item_id, default=None):
+        if not isinstance(item_id, str):
+            return default
+        pathname = os.path.join(self.path, item_id)
+        if not os.path.exists(pathname) and default is not None:
+            return default
+        return open(os.path.join(pathname), 'rb')
 
     def delete(self, item_id):
         pathname = os.path.join(self.path, item_id)
@@ -118,3 +152,4 @@ class FileBucket(BaseBucket):
 
 
 Bucket = FileBucket
+
