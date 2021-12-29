@@ -4,6 +4,8 @@
 # pylint: disable=missing-docstring, no-member
 
 from decimal import Decimal
+from datetime import datetime, date
+import io
 import unittest
 
 import gitdata.stores.facts
@@ -120,6 +122,42 @@ class EntityStoreSuite:
 
     def test_store_integer(self):
         value = 1
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'], value)
+
+    def test_store_decimal(self):
+        value = Decimal('2.4')
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'], value)
+
+    def test_store_date(self):
+        value = date(2021, 1, 1)
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'], value)
+
+    def test_store_datetime(self):
+        value = datetime(2021, 1, 1, 12, 10, 1)
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'], value)
+
+    def test_store_float(self):
+        value = 1.245
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'], value)
+
+    def test_store_bool(self):
+        value = True
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'], value)
+
+    def test_store_bytes(self):
+        value = b'test123'
         new_id = self.store.put(dict(value=value))
         entity = self.store.get(new_id)
         self.assertEqual(entity['value'], value)
@@ -257,7 +295,7 @@ class Sqlite3FactStoreTests(EntityStoreSuite, unittest.TestCase):
     """Sqlite3 Fact Store Tests"""
 
     def setUp(self):
-        self.store = gitdata.stores.facts.Sqlite3Store(':memory:')
+        self.store = gitdata.stores.facts.Sqlite3FactStore(':memory:')
         self.store.setup()
 
 
@@ -265,6 +303,6 @@ class MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
     """Memory Fact Store Tests"""
 
     def setUp(self):
-        self.store = gitdata.stores.facts.MemoryStore()
+        self.store = gitdata.stores.facts.MemoryFactStore()
         self.store.setup()
 

@@ -3,10 +3,8 @@
 """
 
 import sqlite3
-import uuid
 
 import gitdata
-from gitdata.utils import new_uid
 from .common import fixval, get_type_str, AbstractStore, entify, retype
 
 valid_types = [
@@ -34,7 +32,7 @@ def get_db(connection):
     return query
 
 
-class Sqlite3Store(AbstractStore):
+class Sqlite3FactStore(AbstractStore):
     """Sqlite3 based Entity Store"""
 
     def __init__(self, *args, **kwargs):
@@ -159,7 +157,7 @@ class Sqlite3Store(AbstractStore):
                 msg = 'unsupported type <type %s> in value %r'
                 raise Exception(msg % (atype, keys[n]))
 
-        uid = entity.get('uid', new_uid())
+        uid = entity.get('uid', gitdata.utils.new_uid())
 
         n = len(keys)
         param_list = list(zip([uid]*n, keys, value_types, values))
@@ -200,10 +198,13 @@ class Sqlite3Store(AbstractStore):
         return result
 
 
-class MemoryStore(AbstractStore):
+class MemoryFactStore(AbstractStore):
     """Memory based fact store"""
 
     facts = []
+
+    def __init__(self, new_uid=gitdata.utils.new_uid):
+        self.new_uid = new_uid
 
     def setup(self):
         """Setup persistent store"""
@@ -221,7 +222,7 @@ class MemoryStore(AbstractStore):
 
     def put(self, entity):
         """store an entity"""
-        uid = entity.get('uid', uuid.uuid4().hex)
+        uid = entity.get('uid', self.new_uid())
         facts = ((uid, attribute, value) for attribute, value in entity.items())
         self.add(facts)
         return uid
@@ -235,7 +236,7 @@ class MemoryStore(AbstractStore):
         return result or None
 
     def delete(self, uid):
-        """delete all facts"""
+        """delete all facts for an entity"""
         self.facts[:] = (fact for fact in self.facts if fact[0] != uid)
 
     def clear(self):
@@ -261,3 +262,5 @@ class MemoryStore(AbstractStore):
     def __len__(self):
         """return the number of facts stored"""
         return len(self.facts)
+
+FactStore = MemoryFactStore
