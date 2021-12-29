@@ -44,8 +44,7 @@ class FileBucket(BaseBucket):
     in the site.ini configuration file.
 
     >>> import gitdata, tempfile
-    >>> dir = tempfile.TemporaryDirectory()
-    >>> path = str(dir)
+    >>> path = tempfile.TemporaryDirectory().name
     >>> ids = ['id_%04d' % (9-i) for i in range(10)]
     >>> new_id = ids.pop
 
