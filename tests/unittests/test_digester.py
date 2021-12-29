@@ -42,8 +42,6 @@ class TestDigester(unittest.TestCase):
     def test_list_of_dict(self):
         uid = self.digester.digest([dict(name='Joe', age=12), dict(name='Sally')])
         self.assertEqual(uid, '1')
-
-        print(self.digester.known)
         self.assertEqual(
             self.digester.known,
             [
