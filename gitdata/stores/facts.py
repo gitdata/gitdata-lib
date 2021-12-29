@@ -2,9 +2,12 @@
     gitdata fact store
 """
 
+import io
+import os
 import sqlite3
 
 import gitdata
+import gitdata.buckets
 from .common import fixval, get_type_str, AbstractStore, entify, retype
 
 valid_types = [
@@ -35,8 +38,20 @@ def get_db(connection):
 class Sqlite3FactStore(AbstractStore):
     """Sqlite3 based Entity Store"""
 
-    def __init__(self, *args, **kwargs):
-        self.connection = sqlite3.Connection(*args, **kwargs)
+    def __init__(self, database, *args, new_uid=gitdata.utils.new_uid, **kwargs):
+        self.database = database
+        self.new_uid = new_uid
+        self.connection = sqlite3.Connection(database, *args, **kwargs)
+        if database == ':memory:':
+            self.bucket = gitdata.buckets.MemoryBucket(id_factory=new_uid)
+        else:
+            path = os.path.dirname(database or '.')
+            self.bucket = gitdata.buckets.FileBucket(path, id_factory=new_uid)
+
+    def __del__(self):
+        if self.database != ':memory:':
+            path = os.path.dirname(self.database or '.')
+            self.bucket.clear()
 
     def setup(self):
         """Set up the persistent data store"""
@@ -61,6 +76,8 @@ class Sqlite3FactStore(AbstractStore):
         records = []
         for entity, attribute, value in facts:
             if value is not None:
+                if isinstance(value, io.BytesIO):
+                    value = self.bucket.puts(value)
                 value_type = get_type_str(value)
                 if value_type in valid_types:
                     records.append((entity, attribute, value_type, value))
@@ -147,8 +164,13 @@ class Sqlite3FactStore(AbstractStore):
     def put(self, entity):
         """stores an entity"""
 
+        def bucketize(v):
+            if isinstance(v, io.BytesIO):
+                return self.bucket.puts(v)
+            return v
+
         keys = [k.lower() for k in entity.keys()]
-        values = [entity[k] for k in keys]
+        values = [bucketize(entity[k]) for k in keys]
         value_types = [get_type_str(v) for v in values]
         values = [fixval(i) for i in values]  # same fix as above
 
@@ -169,10 +191,13 @@ class Sqlite3FactStore(AbstractStore):
 
     def get(self, uid):
         """get an entity from the entity store"""
+        def unbucketize(fact):
+            s, p, t, o = fact
+            return s, p, t, self.bucket.gets(o, o)
         select = 'select * from facts where entity=?'
         cursor = self.connection.cursor()
         cursor.execute(select, (uid,))
-        facts = cursor.fetchall()
+        facts = list(map(unbucketize, cursor.fetchall()))
         result = entify(facts)
         return result
 
@@ -188,7 +213,6 @@ class Sqlite3FactStore(AbstractStore):
         with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute('delete from facts')
-            print('deleting all facts')
 
     def __len__(self):
         """return the number of facts stored"""

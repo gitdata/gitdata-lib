@@ -6,9 +6,13 @@
 from decimal import Decimal
 from datetime import datetime, date
 import io
+import tempfile
 import unittest
+import os.path
 
 import gitdata.stores.facts
+from gitdata.utils import test_uid_maker
+
 
 class EntityStoreSuite:
     """Standard Entity Store Test Suite"""
@@ -162,6 +166,13 @@ class EntityStoreSuite:
         entity = self.store.get(new_id)
         self.assertEqual(entity['value'], value)
 
+    def test_store_stream(self):
+        content = b'test123'
+        value = io.BytesIO(content)
+        new_id = self.store.put(dict(value=value))
+        entity = self.store.get(new_id)
+        self.assertEqual(entity['value'].read(), content)
+
     def test_supported_values(self):
         values = ['test', 1, Decimal('2.1')]
         for value in values:
@@ -291,11 +302,26 @@ class EntityStoreSuite:
         )
 
 
-class Sqlite3FactStoreTests(EntityStoreSuite, unittest.TestCase):
+class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
     """Sqlite3 Fact Store Tests"""
 
     def setUp(self):
-        self.store = gitdata.stores.facts.Sqlite3FactStore(':memory:')
+        # path = tempfile.TemporaryDirectory().name
+        path = 'tmp'
+        pathname = os.path.join(path, '.gitdata')
+        self.store = gitdata.stores.facts.Sqlite3FactStore(pathname)
+        self.store.setup()
+
+    def tearDown(self):
+        self.store.connection.close()
+        os.remove('tmp/.gitdata')
+
+
+class Sqlite3MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
+    """Sqlite3 Fact Store Tests"""
+
+    def setUp(self):
+        self.store = gitdata.stores.facts.Sqlite3FactStore(':memory:', new_uid=test_uid_maker())
         self.store.setup()
 
 
