@@ -77,7 +77,8 @@ class Undigester(object):
         """undigest some facts"""
         data = {}
         result = self._undigest(facts, data)
-        return result.pop(list(result.keys())[0])
+        keys = list(result.keys())
+        return result.pop(keys[0]) if keys else None
 
 
 def digested(data, new_uid=gitdata.utils.new_uid):
