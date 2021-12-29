@@ -96,7 +96,7 @@ class Sqlite3FactStore(AbstractStore):
             cursor = self.connection.cursor()
             cursor.executemany(delete, records)
 
-    def triples(self, pattern):
+    def triples(self, pattern=(None, None, None)):
         """Return triples matching pattern"""
 
         sub, pred, obj = pattern
@@ -267,7 +267,7 @@ class MemoryFactStore(AbstractStore):
         """clear the fact store"""
         self.facts = []
 
-    def triples(self, pattern):
+    def triples(self, pattern=(None, None, None)):
         """Return facts matching pattern"""
 
         sub, pred, obj = pattern
