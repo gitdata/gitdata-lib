@@ -67,4 +67,5 @@ class TestMemoryRepository(RepositorySuite, unittest.TestCase):
 
     def setUp(self):
         self.repository = gitdata.repositories.Repository()
+        self.repository.graph.clear()
 
