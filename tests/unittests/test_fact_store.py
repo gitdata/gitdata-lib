@@ -310,13 +310,13 @@ class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
         path = 'tmp'
         if not os.path.exists(path):
             os.mkdir(path)
-        pathname = os.path.join(path, '.gitdata')
+        pathname = os.path.join(path, 'facts')
         self.store = gitdata.stores.facts.Sqlite3FactStore(pathname)
         self.store.setup()
 
     def tearDown(self):
         self.store.connection.close()
-        os.remove('tmp/.gitdata')
+        os.remove('tmp/facts')
 
 
 class Sqlite3MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
