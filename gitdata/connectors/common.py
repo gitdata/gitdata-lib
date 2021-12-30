@@ -167,3 +167,16 @@ def fetch(ref):
             if facts:
                 add_connection_metadata(facts)
                 return facts
+
+def get(ref):
+    """Get Data
+
+    Get the facts from a datasource.
+    """
+    connectors = get_connectors()
+    for connector in connectors:
+        if hasattr(connector, 'get'):
+            facts = connector().get(ref)
+            if facts:
+                add_connection_metadata(facts)
+                return facts
