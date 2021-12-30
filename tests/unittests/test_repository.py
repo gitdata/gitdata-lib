@@ -20,14 +20,17 @@ class RepositorySuite:
         self.assertEqual(len(self.repository.graph.facts), 0)
 
     def test_fetch(self):
-        self.repository.fetch('examples/miserables.json')
+        pathname = 'examples/miserables.json'
+        self.assertTrue(os.path.isfile(pathname))
+        self.repository.fetch(pathname)
         self.assertEqual(len(self.repository.graph.facts), 9)
 
     def test_facts(self):
-        repository = self.repository
-        repository.fetch('examples/miserables.json')
+        pathname = 'examples/miserables.json'
+        self.assertTrue(os.path.isfile(pathname))
+        self.repository.fetch(pathname)
         self.assertEqual(len(self.repository.graph.facts), 9)
-        result = repository.graph.facts.triples((None, 'filename', None))
+        result = self.repository.graph.facts.triples((None, 'filename', None))
         _, _, filename = list(result)[0]
         self.assertEqual(filename, 'miserables.json')
 
