@@ -48,11 +48,6 @@ class Sqlite3FactStore(AbstractStore):
             path = os.path.dirname(database or '.')
             self.bucket = gitdata.buckets.FileBucket(path, id_factory=new_uid)
 
-    def __del__(self):
-        if self.database != ':memory:':
-            path = os.path.dirname(self.database or '.')
-            self.bucket.clear()
-
     def setup(self):
         """Set up the persistent data store"""
         sql = """
@@ -288,3 +283,14 @@ class MemoryFactStore(AbstractStore):
         return len(self.facts)
 
 FactStore = MemoryFactStore
+
+
+def facts_of(location, new_uid=gitdata.utils.new_uid):
+    """Return a fact store for a location"""
+    if location == ':memory:' or location is None:
+        return MemoryFactStore(new_uid=new_uid)
+    if os.path.isdir(location):
+        return Sqlite3FactStore(
+            os.path.join(location, 'facts'), new_uid=new_uid
+        )
+    raise Exception('fatal: not a GitData respository')
