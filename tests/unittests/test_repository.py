@@ -58,8 +58,6 @@ class TestLocalRepository(RepositorySuite, unittest.TestCase):
             os.mkdir(working_directory)
         gitdata.repositories.create_respository(working_directory)
         self.repository = gitdata.repositories.Repository(working_directory)
-        print(os.listdir('tmp/.gitdata'))
-        self.repository.fetch('examples/miserables.json')
 
     def tearDown(self):
         gitdata.repositories.remove_respository(self.working_directory)
