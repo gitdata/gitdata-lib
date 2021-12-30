@@ -6,12 +6,10 @@ import base64
 import datetime
 from decimal import Decimal
 from datetime import datetime, date
-import io
 
 import gitdata
 from gitdata.digester import digested, undigested
-from gitdata.buckets import FileBucket, MemoryBucket
-from gitdata.stores.facts import FactStore
+from gitdata.stores.facts import facts_of
 
 def retype(value, value_type):
     """convert a value back to its original type"""
@@ -204,9 +202,11 @@ class Graph:
     """Basic Graph"""
 
     def __init__(self, location=None, new_uid=gitdata.utils.new_uid):
-        self.db = gitdata.database.connect()
-        self.facts = FactStore(new_uid=new_uid)
+        self.facts = facts_of(location, new_uid=new_uid)
         self.new_uid = new_uid
+
+    def setup(self):
+        self.facts.setup()
 
     def add(self, data):
         """Add data to the graph"""
@@ -314,8 +314,3 @@ class Graph:
 
     def __len__(self):
         return len(self.facts)
-
-
-# def get_graph(db=None):
-#     db = db or gitdata.database.connect()
-#     return Graph(db)
