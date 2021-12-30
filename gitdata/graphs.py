@@ -41,7 +41,7 @@ def retype(value, value_type):
         value = datetime(y, m, d, hr, mn, sc)
 
     elif value_type == "stream":
-        None
+        value = None
 
     elif value_type == "datetime.datetime":
         y = int(value[:4])
@@ -66,48 +66,6 @@ def retype(value, value_type):
         raise Exception(msg)
 
     return value
-
-
-class AbstractFactStore(object):
-    """Abstract Fact Store"""
-
-    def add(self, facts):
-        """add facts to the fact store"""
-
-    def remove(self, facts):
-        """remove facts from the fact store"""
-
-    def matching(self, pattern):
-        """return facts that match the pattern"""
-
-    def put(self, entity):
-        """put an entity into the fact store"""
-
-    def get(self, uid):
-        """get an entity from the fact store"""
-
-    def delete(self, uid):
-        """delete an entity from the fact store"""
-
-    def clear(self):
-        """delete all facts from the fact store"""
-
-    def __len__(self):
-        """return the number of facts stored"""
-
-    def __repr__(self):
-        pattern = (None, None, None)
-        return '{}({})'.format(
-            self.__class__.__name__,
-            ', '.join(
-                repr(fact)
-                for fact in self.matching(pattern)
-            )
-        )
-
-    def __str__(self):
-        pattern = (None, None, None)
-        return '\n'.join(repr(fact) for fact in self.matching(pattern))
 
 
 # class Node:
