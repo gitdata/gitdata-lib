@@ -7,5 +7,7 @@
 
 docker run \
    -it \
-   -v $(pwd):/builds/gitdata/gitdata-lib:ro python:3.9 \
-   bash -c "cd /builds/gitdata/gitdata-lib && source tests/setup_container.sh && nosetests -vx --with-doctest tests/unittests gitdata/utils.py"
+   -v $(pwd):/builds/gitdata/gitdata-lib:ro \
+   -v $(pwd)/tmp:/builds/gitdata/gitdata-lib/tmp \
+   python:3.9 \
+   bash -c "cd /builds/gitdata/gitdata-lib && bash tests/run_in_docker.sh"
