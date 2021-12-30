@@ -45,7 +45,7 @@ class Sqlite3FactStore(AbstractStore):
         if database == ':memory:':
             self.bucket = gitdata.buckets.MemoryBucket(id_factory=new_uid)
         else:
-            path = os.path.dirname(database or '.')
+            path = os.path.join(os.path.dirname(database or '.'), 'blobs')
             self.bucket = gitdata.buckets.FileBucket(path, id_factory=new_uid)
 
     def setup(self):
@@ -205,6 +205,7 @@ class Sqlite3FactStore(AbstractStore):
 
     def clear(self):
         """delete all facts"""
+        self.bucket.clear()
         with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute('delete from facts')

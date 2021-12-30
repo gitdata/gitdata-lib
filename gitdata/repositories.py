@@ -7,6 +7,7 @@ import getpass
 import logging
 import os
 import platform
+import shutil
 
 from gitdata.connectors.common import (
     get
@@ -45,10 +46,7 @@ def remove_respository(pathname):
     if os.path.isdir(pathname):
         repository_path = os.path.join(pathname, '.gitdata')
         if os.path.exists(repository_path):
-            for filename in os.listdir(repository_path):
-                os.remove(os.path.join(
-                    repository_path, filename))
-            os.rmdir(repository_path)
+            shutil.rmtree(repository_path)
 
 
 def add_connection_metadata(facts, **kwargs):

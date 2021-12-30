@@ -315,8 +315,10 @@ class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
         self.store.setup()
 
     def tearDown(self):
+        self.store.clear()
         self.store.connection.close()
         os.remove('tmp/facts')
+        os.rmdir('tmp/blobs')
 
 
 class Sqlite3MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):

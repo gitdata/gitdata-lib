@@ -17,15 +17,16 @@ class RepositorySuite:
 
     def test_fetch_nothing(self):
         self.assertIsNone(self.repository.fetch('examples/not_a_file.json'))
+        self.assertEqual(len(self.repository.graph.facts), 0)
 
     def test_fetch(self):
         self.repository.fetch('examples/miserables.json')
-        # print(self.repository.graph.db('select * from facts'))
-        # print(facts)
+        self.assertEqual(len(self.repository.graph.facts), 9)
 
     def test_facts(self):
         repository = self.repository
         repository.fetch('examples/miserables.json')
+        self.assertEqual(len(self.repository.graph.facts), 9)
         result = repository.graph.facts.triples((None, 'filename', None))
         _, _, filename = list(result)[0]
         self.assertEqual(filename, 'miserables.json')
