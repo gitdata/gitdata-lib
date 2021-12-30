@@ -152,7 +152,6 @@ def locate_config_file(filename='gitdata.ini', start='.'):
             return pathname
 
     for path in OrderedSet(parents(join(expanduser('~')))) - ancestors:
-        print(path)
         pathname = join(path, filename)
         if exists(pathname):
             return pathname
