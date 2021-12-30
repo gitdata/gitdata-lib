@@ -56,7 +56,7 @@ class GraphTests(unittest.TestCase):
 
     def test_empty_graph(self):
         g = self.graph
-        self.assertEqual(g.facts.triples((None, None, None)), [])
+        self.assertEqual(g.facts.matching((None, None, None)), [])
 
     def test_add(self):
         g = self.graph
@@ -109,12 +109,12 @@ class GraphTests(unittest.TestCase):
     def test_add_dict(self):
         g = self.graph
         g.add(dict(value=2))
-        self.assertEqual(g.facts.triples(), [('1', 'value', 2)])
+        self.assertEqual(g.facts.matching(), [('1', 'value', 2)])
 
     def test_add_list(self):
         g = self.graph
         g.add([1, 2, 3])
-        self.assertEqual(g.facts.triples((None, None, None)), [
+        self.assertEqual(g.facts.matching((None, None, None)), [
             ('1', 'includes', 1),
             ('1', 'includes', 2),
             ('1', 'includes', 3)
@@ -129,7 +129,7 @@ class GraphTests(unittest.TestCase):
             created_by=1,
         )
         g.add(project_attributes)
-        self.assertEqual(g.facts.triples(), [
+        self.assertEqual(g.facts.matching(), [
             ('1', 'name', 'Sample'),
             ('1', 'kind', 'project'),
             ('1', 'created', datetime.datetime(2019, 6, 10)),
@@ -140,7 +140,7 @@ class GraphTests(unittest.TestCase):
         g = self.graph
         g.add(dict(data='123'))
         g.add(dict(data='234'))
-        self.assertEqual(g.facts.triples(), [('1', 'data', '123'), ('2', 'data', '234')])
+        self.assertEqual(g.facts.matching(), [('1', 'data', '123'), ('2', 'data', '234')])
 
     def test_convert_to_dict(self):
         g = self.graph
@@ -164,7 +164,7 @@ class GraphTests(unittest.TestCase):
     #     self.assertEqual(node['kind'], 'project')
 
     #     node.add('status', 'draft')
-    #     self.assertEqual(g.facts.triples(), [
+    #     self.assertEqual(g.facts.matching(), [
     #         ('1', 'name', 'Sample'),
     #         ('1', 'kind', 'project'),
     #         ('1', 'created', datetime.datetime(2019, 6, 10)),
@@ -184,7 +184,7 @@ class GraphTests(unittest.TestCase):
     #     node = g.first(name='Sample')
 
     #     node.add('cities', ['Vancouver', 'Victoria'])
-    #     self.assertEqual(g.triples(), [
+    #     self.assertEqual(g.matching(), [
     #         ('1', 'name', 'Sample'),
     #         ('1', 'kind', 'project'),
     #         ('1', 'created', datetime.datetime(2019, 6, 10)),
@@ -212,7 +212,7 @@ class GraphTests(unittest.TestCase):
 
     #     attribute = (node.uid, 'cities', uid)
     #     g.store.add([attribute])
-    #     self.assertEqual(g.triples(), [
+    #     self.assertEqual(g.matching(), [
     #         ('1', 'name', 'Sample'),
     #         ('1', 'kind', 'project'),
     #         ('1', 'created', datetime.datetime(2019, 6, 10)),
@@ -240,7 +240,7 @@ class GraphTests(unittest.TestCase):
     #         dict(name='Victoria'),
     #     ])
 
-    #     self.assertEqual(g.triples(), [
+    #     self.assertEqual(g.matching(), [
     #         ('1', 'name', 'Sample'),
     #         ('1', 'kind', 'project'),
     #         ('1', 'created', datetime.datetime(2019, 6, 10)),

@@ -128,7 +128,7 @@ class AbstractStore:
     def remove(self, facts):
         """remove facts from the entity store"""
 
-    def triples(self, pattern):
+    def matching(self, pattern):
         """return facts that match the pattern"""
 
     def put(self, entity):
@@ -152,10 +152,10 @@ class AbstractStore:
             self.__class__.__name__,
             ', '.join(
                 repr(rec)
-                for rec in self.triples(pattern)
+                for rec in self.matching(pattern)
             )
         )
 
     def __str__(self):
         pattern = (None, None, None)
-        return '\n'.join(repr(triple) for triple in self.triples(pattern))
+        return '\n'.join(repr(fact) for fact in self.matching(pattern))

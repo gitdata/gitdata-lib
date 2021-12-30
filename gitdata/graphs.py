@@ -86,15 +86,15 @@ def retype(value, value_type):
 #     def delete(self):
 #         """Delete all facts related to a node"""
 #         self.graph.store.remove(
-#             self.graph.triples((self.uid, None, None))
+#             self.graph.matching((self.uid, None, None))
 #         )
 
 #     def __getitem__(self, name):
-#         values = self.graph.triples((self.uid, name, None))
+#         values = self.graph.matching((self.uid, name, None))
 #         return values[0][-1] if values else None
 
 #     def __getattr__(self, name):
-#         values = self.graph.triples((self.uid, name, None))
+#         values = self.graph.matching((self.uid, name, None))
 #         return values[0][-1] if values else None
 
 #     def keys(self):
@@ -106,7 +106,7 @@ def retype(value, value_type):
 #             yield v
 
 #     def items(self):
-#         for _, p, o in self.graph.triples((self.uid, None, None)):
+#         for _, p, o in self.graph.matching((self.uid, None, None)):
 #             if self.graph.get(o):
 #                 o = Node(graph=self.graph, uid=o)
 #             result = p, o
@@ -124,14 +124,14 @@ def retype(value, value_type):
 #             for member in members:
 #                 yield Node(graph=self.graph, **member)
 
-#         if self.graph.triples((self.uid, 'includes', None)):
-#             for _, _, o in self.graph.triples((self.uid, 'includes', None)):
+#         if self.graph.matching((self.uid, 'includes', None)):
+#             for _, _, o in self.graph.matching((self.uid, 'includes', None)):
 #                 yield Node(graph=self.graph, uid=o)
 #         return self.keys()
 
 #     def __str__(self):
 
-#         members = [o for s, p, o in self.graph.triples((self.uid, 'includes', None))]
+#         members = [o for s, p, o in self.graph.matching((self.uid, 'includes', None))]
 #         if members:
 #             return repr(tuple(Node(graph=self.graph, uid=n) for n in members))
 
@@ -150,7 +150,7 @@ def retype(value, value_type):
 
 #     def __repr__(self):
 #         # pattern = (self.uid, None, None)
-#         members = [o for s, p, o in self.graph.triples((self.uid, 'includes', None))]
+#         members = [o for s, p, o in self.graph.matching((self.uid, 'includes', None))]
 #         if members:
 #             return repr(tuple(Node(graph=self.graph, uid=n) for n in members))
 #         return f'Node({self.uid})'
@@ -176,7 +176,7 @@ class Graph:
 
     def delete(self, pattern):
         """Delete all facts matching the pattern"""
-        facts = self.facts.triples(pattern)
+        facts = self.facts.matching(pattern)
         self.facts.remove(facts)
 
     def get(self, uids):
@@ -189,7 +189,7 @@ class Graph:
 
         result = []
         for uid in sorted(uids):
-            values = {k: v for _, k, v in self.facts.triples((uid, None, None))}
+            values = {k: v for _, k, v in self.facts.matching((uid, None, None))}
             if values:
                 result.append(dict(**values))
 
@@ -211,7 +211,7 @@ class Graph:
                     bpos[x] = pos
                 else:
                     qc.append(x)
-            rows = list(facts.triples((qc[0], qc[1], qc[2])))
+            rows = list(facts.matching((qc[0], qc[1], qc[2])))
             # print(rows)
             if bindings is None:
                 # This is the first pass, everything matches
@@ -268,7 +268,7 @@ class Graph:
 
     def __str__(self):
         """Human friendly string representation"""
-        return '\n'.join(repr(triple) for triple in self.facts.triples())
+        return '\n'.join(repr(fact) for fact in self.facts.matching())
 
     def __len__(self):
         return len(self.facts)

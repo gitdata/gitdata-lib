@@ -23,7 +23,7 @@ class EntityStoreSuite:
         dict(name='Terry', score=2, rate=Decimal('2')),
     ]
 
-    triples = [
+    facts = [
         ('2', 'name', 'Joe'),
         ('2', 'age', 12),
         ('1', 'includes', '2'),
@@ -35,7 +35,7 @@ class EntityStoreSuite:
     def test_add(self):
         joe = self.store.get('2')
         self.assertEqual(joe, None)
-        self.store.add(self.triples)
+        self.store.add(self.facts)
         joe = self.store.get('2')
         self.assertEqual(joe['name'], 'Joe')
 
@@ -68,7 +68,7 @@ class EntityStoreSuite:
     def test_remove(self):
         joe = self.store.get('2')
         self.assertEqual(joe, None)
-        self.store.add(self.triples)
+        self.store.add(self.facts)
         joe = self.store.get('2')
         self.assertEqual(joe['name'], 'Joe')
         self.store.remove([('2', 'name', 'Joe')])
@@ -182,17 +182,17 @@ class EntityStoreSuite:
 
     def test_spo(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples(('2', 'name', 'Joe'))),
+            list(self.store.matching(('2', 'name', 'Joe'))),
             [('2', 'name', 'Joe')],
         )
 
     def test_spn(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples(('3', 'name', None))),
+            list(self.store.matching(('3', 'name', None))),
             [
                 ('3', 'name', 'Sally')
             ],
@@ -200,9 +200,9 @@ class EntityStoreSuite:
 
     def test_sno(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples(('2', None, 'Joe'))),
+            list(self.store.matching(('2', None, 'Joe'))),
             [
                 ('2', 'name', 'Joe')
             ],
@@ -210,9 +210,9 @@ class EntityStoreSuite:
 
     def test_snn(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples(('3', None, None))),
+            list(self.store.matching(('3', None, None))),
             [
                 ('3', 'name', 'Sally'),
                 ('3', 'wage', 22.1),
@@ -221,9 +221,9 @@ class EntityStoreSuite:
 
     def test_npo(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples((None, 'name', 'Sally'))),
+            list(self.store.matching((None, 'name', 'Sally'))),
             [
                 ('3', 'name', 'Sally'),
             ],
@@ -231,9 +231,9 @@ class EntityStoreSuite:
 
     def test_npn(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples((None, 'name', None))),
+            list(self.store.matching((None, 'name', None))),
             [
                 ('2', 'name', 'Joe'),
                 ('3', 'name', 'Sally'),
@@ -242,9 +242,9 @@ class EntityStoreSuite:
 
     def test_nno(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples((None, None, 12))),
+            list(self.store.matching((None, None, 12))),
             [
                 ('2', 'age', 12),
             ],
@@ -252,9 +252,9 @@ class EntityStoreSuite:
 
     def test_nnn(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
-            list(self.store.triples((None, None, None))),
+            list(self.store.matching((None, None, None))),
             [
                 ('2', 'name', 'Joe'),
                 ('2', 'age', 12),
@@ -267,14 +267,14 @@ class EntityStoreSuite:
 
     def test_len(self):
         store = self.store
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(len(store), 6)
 
     def test_str(self):
         store = self.store
         self.assertEqual(str(self.store), '')
 
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
             str(self.store),
             (
@@ -293,7 +293,7 @@ class EntityStoreSuite:
 
         self.assertEqual(repr(self.store), '%s()' % store_name)
 
-        store.add(self.triples)
+        store.add(self.facts)
         self.assertEqual(
             repr(self.store),
             "%s(('2', 'name', 'Joe'), ('2', 'age', 12),"

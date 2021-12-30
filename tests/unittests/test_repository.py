@@ -26,7 +26,7 @@ class RepositorySuite:
         self.assertTrue(os.path.isfile(pathname))
         self.repository.fetch(pathname)
         self.assertEqual(len(self.repository.graph.facts), 9)
-        result = self.repository.graph.facts.triples((None, 'filename', None))
+        result = self.repository.graph.facts.matching((None, 'filename', None))
         _, _, filename = list(result)[0]
         self.assertEqual(filename, 'miserables.json')
 
