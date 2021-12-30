@@ -4,16 +4,12 @@
 # pylint: disable=missing-docstring, no-member
 
 import os
-import time
 
 import unittest
 import gitdata.repositories
 
 
 class RepositorySuite:
-
-    # def setUp(self):
-    #     self.repository = gitdata.repositories.Repository()
 
     def test_fetch_nothing(self):
         self.assertIsNone(self.repository.fetch('examples/not_a_file.json'))
@@ -72,4 +68,3 @@ class TestMemoryRepository(RepositorySuite, unittest.TestCase):
     def setUp(self):
         self.repository = gitdata.repositories.Repository()
         self.repository.graph.clear()
-
