@@ -6,3 +6,4 @@ python-dotenv
 requests
 docopt
 webdavclient3>=3.14.5
+faker

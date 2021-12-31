@@ -2,11 +2,10 @@
     connector tests
 """
 
-import platform
 import unittest
 
 import gitdata.connectors
-
+from gitdata.connectors.common import get
 
 # class TestConnectors(unittest.TestCase):
 
@@ -90,3 +89,45 @@ class TestBaseConnector(unittest.TestCase):
 #     def test_csv_edges(self):
 #         edges = gitdata.connectors.common.get_connector_graph()
 #         self.assertIn(('console', 'text', 'stdout'), edges)
+
+class People(gitdata.utils.RecordList):
+
+    @property
+    def sex(self):
+        return [
+            p['sex']
+            for p in self
+        ]
+
+
+class Addresses(gitdata.utils.RecordList):
+    pass
+
+
+def expecting_in(values, allowed):
+    return all(v in allowed for v in values)
+
+
+def limit(count, iterator):
+    """Grab at most count items from iterator"""
+    for item in iterator:
+        yield item
+        count -= 1
+        if not count:
+            break
+
+
+class TestFake(unittest.TestCase):
+
+    def test_people(self):
+        fake = get('fake')
+        people = People(limit(20, fake['people']))
+        self.assertTrue(
+            expecting_in(people.sex, ['M', 'F'])
+        )
+        self.assertEqual(len(people), 20)
+
+    def test_addresses(self):
+        fake = get('fake')
+        addresses = Addresses(limit(10, fake['addresses']))
+        self.assertEqual(len(addresses), 10)
