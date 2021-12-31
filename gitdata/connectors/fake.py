@@ -10,28 +10,36 @@ from gitdata.connectors.common import BaseConnector
 class FakeConnector(BaseConnector):
 
     @property
-    def people(self):
+    def person(self):
         fake = faker.Faker()
+        person = fake.profile()
+        first_name, last_name = person['name'].split(maxsplit=1)
+        return dict(
+            first_name=first_name,
+            last_name=last_name,
+            birthdate=person['birthdate'],
+            sex=person['sex']
+        )
+
+    @property
+    def people(self):
         while True:
-            person = fake.profile()
-            first_name, last_name = person['name'].split(maxsplit=1)
-            yield dict(
-                first_name=first_name,
-                last_name=last_name,
-                birthdate=person['birthdate'],
-                sex=person['sex']
-            )
+            yield self.person
+
+    @property
+    def address(self):
+        fake = faker.Faker()
+        return dict(
+            street=fake.street_address(),
+            city=fake.city(),
+            state=fake.state(),
+            postal_code=fake.postcode(),
+        )
 
     @property
     def addresses(self):
-        fake = faker.Faker()
         while True:
-            yield dict(
-                street=fake.street_address(),
-                city=fake.city(),
-                state=fake.state(),
-                postal_code=fake.postcode(),
-            )
+            yield self.address
 
     def get(self, ref):
         if ref.startswith('fake'):
