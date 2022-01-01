@@ -148,7 +148,7 @@ def connect(ref):
 def add_connection_metadata(facts):
     facts.update(
         dict(
-            pulled=datetime.datetime.now(),
+            collected=datetime.datetime.now(),
             node=platform.node(),
             user=getpass.getuser()
         )
