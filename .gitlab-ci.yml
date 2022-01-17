@@ -29,7 +29,7 @@ mariadb:
     GITDATA_TEST_DATABASE_USER: root
     GITDATA_TEST_DATABASE_PASSWORD: root
   script:
-    - nosetests -v tests/unittests/test_database.py:TestMySQLDatabase
+    - nosetests -c .noserc tests/unittests/test_database.py:TestMySQLDatabase
 
 postgres:
   stage: test
@@ -40,4 +40,4 @@ postgres:
     POSTGRES_PASSWORD: password
     GITDATA_TEST_DATABASE_HOST: postgres
   script:
-    - nosetests -v tests/unittests/test_database.py:TestPostgreSQLDatabase
+    - nosetests -c .noserc tests/unittests/test_database.py:TestPostgreSQLDatabase
