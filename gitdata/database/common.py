@@ -344,7 +344,6 @@ class Database:
     def get_table_names(self):
         """get list of database tables"""
 
-
     def get_schema_names(self):
         """Return schema names"""
         return []
