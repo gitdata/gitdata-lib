@@ -15,7 +15,7 @@ general:
     POSTGRES_PASSWORD: password
     GITDATA_TEST_DATABASE_HOST: postgres
   script:
-    - nosetests -v gitdata $(ls tests/unittests/test_*.py | grep -v database)
+    - nosetests -c .noserc gitdata $(ls tests/unittests/test_*.py | grep -v database)
 
 mariadb:
   stage: test
