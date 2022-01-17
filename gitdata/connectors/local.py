@@ -26,6 +26,7 @@ class FileConnector(BaseConnector):
                 content = io.BytesIO(f.read())
 
             return dict(
+                ref=ref,
                 filename=filename,
                 size=stat.st_size,
                 modified=fromtimestamp(stat.st_mtime),
