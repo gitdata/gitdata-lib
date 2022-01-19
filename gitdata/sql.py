@@ -6,7 +6,9 @@ import inspect
 import os
 
 import gitdata
+from gitdata.stores.tables import table_of
 from gitdata import Record
+
 
 from gitdata.utils import (
     RecordList, load
@@ -91,72 +93,72 @@ class SqlTerm:
         return SqlExpression(str(self), '<=', repr(value))
 
 
-class SqlTable:
+# class SqlTable:
 
-    def __init__(self, db, table_name, kind=Record):
-        self.db = db
-        self.table_name = table_name
-        self.kind = kind
+#     def __init__(self, db, table_name, kind=Record):
+#         self.db = db
+#         self.table_name = table_name
+#         self.kind = kind
 
-    def __iter__(self):
-        for row in gitdata.table_of(self.kind, name=self.table_name, db=self.db):
-            yield row
+#     def __iter__(self):
+#         for row in gitdata.table_of(self.kind, name=self.table_name, db=self.db):
+#             yield row
 
-    def __call__(self, *args):
-        columns = ', '.join(a for a in args if not isinstance(a, SqlExpression))
-        clauses = ' and '.join(
-            str(a) for a in args if isinstance(a, SqlExpression)
-        )
-        if clauses:
-            clauses = ' where ' + clauses
-        cmd = 'select %s from %s%s' % (columns, self.table_name, clauses)
-        for row in Result(self.db(cmd), self.kind):
-            yield row
+#     def __call__(self, *args):
+#         columns = ', '.join(a for a in args if not isinstance(a, SqlExpression))
+#         clauses = ' and '.join(
+#             str(a) for a in args if isinstance(a, SqlExpression)
+#         )
+#         if clauses:
+#             clauses = ' where ' + clauses
+#         cmd = 'select %s from %s%s' % (columns, self.table_name, clauses)
+#         for row in Result(self.db(cmd), self.kind):
+#             yield row
 
-    def __len__(self):
-        cmd = f'select count(*) from {self.table_name}'
-        return list(self.db(cmd))[0][0]
+#     def __len__(self):
+#         cmd = f'select count(*) from {self.table_name}'
+#         return list(self.db(cmd))[0][0]
 
-    def select(
-            self, *args,
-            where=None, group_by=None, order_by=None, limit=None
-        ):
-        columns = ', '.join(args)
-        cmd = [
-            'select %s from %s' % (columns, self.table_name)
-        ]
-        if where:
-            cmd.append('where ', where)
-        if group_by:
-            cmd.append('group by ', group_by)
-        if order_by:
-            cmd.append('order by ', order_by)
-        if limit:
-            cmd.append('limit ', limit)
-        for row in Result(self.db(cmd), self.kind):
-            yield row
+#     def select(
+#             self, *args,
+#             where=None, group_by=None, order_by=None, limit=None
+#         ):
+#         columns = ', '.join(args)
+#         cmd = [
+#             'select %s from %s' % (columns, self.table_name)
+#         ]
+#         if where:
+#             cmd.append('where ', where)
+#         if group_by:
+#             cmd.append('group by ', group_by)
+#         if order_by:
+#             cmd.append('order by ', order_by)
+#         if limit:
+#             cmd.append('limit ', limit)
+#         for row in Result(self.db(cmd), self.kind):
+#             yield row
 
-    def __getattr__(self, name):
-        return SqlTerm(name)
+#     def __getattr__(self, name):
+#         return SqlTerm(name)
 
-    def get(self, ids):
-        cmd = f'select * from {self.table_name} where id in %s'
-        as_list = True
-        if isinstance(ids, (int, str)):
-            ids = list(map(int, [ids]))
-            as_list = False
-        rows = Result(self.db(cmd, ids), self.kind)
-        if as_list:
-            return rows
-        else:
-            if rows:
-                return list(rows)[0]
+#     def get(self, ids):
+#         cmd = f'select * from {self.table_name} where id in %s'
+#         as_list = True
+#         if isinstance(ids, (int, str)):
+#             ids = list(map(int, [ids]))
+#             as_list = False
+#         rows = Result(self.db(cmd, ids), self.kind)
+#         if as_list:
+#             return rows
+#         else:
+#             if rows:
+#                 return list(rows)[0]
 
-    def __getitem__(self, key):
-        return self.get(key)
+#     def __getitem__(self, key):
+#         return self.get(key)
 
-    def __str__(self):
-        return str(gitdata.table_of(self.kind, name=self.table_name, db=self.db))
+#     def __str__(self):
+#         return str(gitdata.table_of(self.kind, name=self.table_name, db=self.db))
 
 
 class SqlQuery:
@@ -221,7 +223,7 @@ class SQL:
             return SqlQuery(self.db, pathname)
 
         elif name in self.db.table_names:
-            return SqlTable(self.db, name)
+            return table_of(Record, name=name, db=self.db)
 
 
 def get_sql(path=None, db=None):

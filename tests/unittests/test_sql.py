@@ -6,6 +6,7 @@ import unittest
 
 import gitdata.database
 from gitdata.sql import get_sql
+from gitdata.utils import Record
 
 
 class TestSQL(unittest.TestCase):
@@ -28,6 +29,14 @@ class TestSQL(unittest.TestCase):
             self.assertEqual(
                 user, dict(username='guest')
             )
+
+    def test_table_find(self):
+        sql = get_sql(db=self.db)
+        user = sql.users.first(username='guest')
+        del user['__store']
+        self.assertEqual(
+            user, dict(username='guest')
+        )
 
     def test_query(self):
         sql = get_sql(db=self.db)
