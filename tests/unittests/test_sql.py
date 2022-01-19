@@ -21,6 +21,14 @@ class TestSQL(unittest.TestCase):
             'guest', [u['username'] for u in sql.users]
         )
 
+    def test_table_iter(self):
+        sql = get_sql(db=self.db)
+        for user in sql.users:
+            del user['__store']
+            self.assertEqual(
+                user, dict(username='guest')
+            )
+
     def test_query(self):
         sql = get_sql(db=self.db)
         self.assertIn(
