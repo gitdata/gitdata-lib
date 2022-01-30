@@ -41,9 +41,28 @@ class FakeConnector(BaseConnector):
         while True:
             yield self.address
 
+    @property
+    def location(self):
+        fake = faker.Faker()
+        lat, lng, name, country_code, timezone = fake.location_on_land()
+        return dict(
+            latitude=lat,
+            longitude=lng,
+            name=name,
+            country_code=country_code,
+            timezone=timezone,
+        )
+
+    @property
+    def locations(self):
+        while True:
+            yield self.location
+
     def get(self, ref):
         if ref.startswith('fake'):
+            print('ref is', ref)
             return dict(
                 people=self.people,
                 addresses=self.addresses,
+                locations=self.locations,
             )
