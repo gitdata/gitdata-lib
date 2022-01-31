@@ -12,8 +12,8 @@ import platform
 
 import gitdata.connectors
 import gitdata.ext.connectors
+import gitdata.graphs
 import gitdata.solutions
-
 
 logger = logging.getLogger(__name__)
 
@@ -180,3 +180,10 @@ def get(ref):
             if facts:
                 add_connection_metadata(facts)
                 return facts
+
+def load(ref):
+    """Get a Graph
+    """
+    graph = gitdata.graphs.Graph()
+    graph.add(get(ref))
+    return graph

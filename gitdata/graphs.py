@@ -182,16 +182,23 @@ class Graph:
     def get(self, uids):
         """Get a node of the graph"""
 
+        print('getting', uids)
+
         as_list = True
         if not isinstance(uids, (list, tuple, set)):
             uids = [uids]
             as_list = False
+
+        print('getting', uids)
+        print('matching', self.facts.matching((list(uids)[0], None, None)))
 
         result = []
         for uid in sorted(uids):
             values = {k: v for _, k, v in self.facts.matching((uid, None, None))}
             if values:
                 result.append(dict(**values))
+
+        print('result', result)
 
         if result:
             if as_list:
@@ -253,8 +260,9 @@ class Graph:
         for k, v in kwargs.items():
             query.append(('?subject', k, v))
         subjects = set(record['subject'] for record in self.query(query))
-        result = self.get(subjects) or []
-        return result
+        if subjects:
+            return self.get(subjects) or []
+        return []
 
     def first(self, *args, **kwargs):
         """Find first node"""
@@ -272,3 +280,6 @@ class Graph:
 
     def __len__(self):
         return len(self.facts)
+
+    def __repr__(self):
+        return 'Graph({})'.format(len(self))

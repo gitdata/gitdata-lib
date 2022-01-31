@@ -319,6 +319,7 @@ class GraphTestsPreloaded(unittest.TestCase):
 
     def test_exists(self):
         g = self.graph
+        self.assertFalse(g.exists(kind='animal'))
         self.assertTrue(g.exists(kind='project'))
         g.delete((None, 'kind', 'project'))
         self.assertFalse(g.exists(kind='project'))
