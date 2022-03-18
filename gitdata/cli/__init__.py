@@ -56,4 +56,4 @@ def main():
         exit(__doc__)
 
     else:
-        exit("%r is not a git.py command. See 'git help'." % args['<command>'])
+        exit("%r is not a gitdata command. See 'gitdata help'." % args['<command>'])
