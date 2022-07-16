@@ -9,6 +9,7 @@ options:
 The most commonly used gitdata commands are:
     fetch       fetch data to the local reposotiry
     get         get data
+    scan        scan data
 
 See 'gitdata help <command>' for more information on a specific command.
 """
@@ -48,6 +49,11 @@ def main():
         from gitdata.cli.gitdata_get import get, __doc__ as doc
         args = docopt(doc, argv=argv)
         get(args)
+
+    elif args['<command>'] == 'scan':
+        from gitdata.cli.gitdata_scan import scan_to_console, __doc__ as doc
+        args = docopt(doc, argv=argv)
+        scan_to_console(args)
 
     elif args['<command>'] in ['help', None]:
         if args['<args>'] == ['get']:
