@@ -12,7 +12,7 @@ import os
 
 import gitdata
 from gitdata.connectors.common import load, connect
-from gitdata.ext.connectors.http import HttpConnector
+from gitdata.connectors.http import HttpConnector
 
 
 def as_blobs(ref):
