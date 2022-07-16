@@ -21,7 +21,7 @@ mariadb:
   stage: test
   image: python:3.9
   services:
-    - mariadb:latest
+    - mariadb:10.7
   variables:
     MYSQL_DATABASE: gitdatatest
     MYSQL_ROOT_PASSWORD: root
