@@ -6,6 +6,7 @@ import unittest
 
 import gitdata.connectors
 from gitdata.connectors.common import get
+from gitdata.connectors import extract
 
 # class TestConnectors(unittest.TestCase):
 
@@ -131,3 +132,10 @@ class TestFake(unittest.TestCase):
         fake = get('fake')
         addresses = Addresses(limit(10, fake['addresses']))
         self.assertEqual(len(addresses), 10)
+
+
+class TestExtract(unittest.TestCase):
+
+    def test_extract_csv(self):
+        t = extract('examples/locations.csv')
+        # self.assertEqual(t.filename, 'locations.csv')

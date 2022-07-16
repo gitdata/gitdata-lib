@@ -16,7 +16,39 @@ class FileConnector(BaseConnector):
     reads = ['location']
     writes = ['text', 'blob', 'stdout']
 
+    # def connects(self, ref):
+    #     return os.path.isfile(ref)
+
+    def connect(self, ref):
+        self.ref = ref
+        return os.path.isfile(ref)
+
+    def get_blobs(self):
+        with open(self.ref, 'rb') as f:
+            return [io.BytesIO(f.read())]
+
     def get(self, ref):
+        if os.path.isfile(ref):
+            stat = os.stat(ref)
+            pathname = os.path.realpath(ref)
+            path, filename = os.path.split(pathname)
+
+            with open(ref, 'rb') as f:
+                content = io.BytesIO(f.read())
+
+            return dict(
+                ref=ref,
+                filename=filename,
+                size=stat.st_size,
+                modified=fromtimestamp(stat.st_mtime),
+                created=fromtimestamp(stat.st_ctime),
+                path=path,
+                blob=content
+            )
+
+    def extract(self, ref):
+        """extract data from a ref"""
+        print('extracting', ref)
         if os.path.isfile(ref):
             stat = os.stat(ref)
             pathname = os.path.realpath(ref)

@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 def get_connectors():
     """generate connectors"""
-    path = gitdata.connectors.__path__
 
+    path = gitdata.connectors.__path__
     for _, name, _ in pkgutil.iter_modules(path):
         if name != 'common':
             module = importlib.import_module('gitdata.connectors.' + name)
@@ -121,6 +121,15 @@ class BaseConnector:
     def connect(self, ref):
         """Connect to a ref"""
 
+    def extract(self, ref):
+        """Extract facts from a ref"""
+
+    def get_tables(self):
+        return []
+
+    def get_blobs(self):
+        return []
+
     # def explore(self, data):
     #     """Explore a graph
     #     """
@@ -131,16 +140,13 @@ def connect(ref):
     """Return a connection to a ref"""
 
     for connector in get_connectors():
-        if connector.connects(ref):
-            connection = connector()
-            connection.connect(ref)
+        connection = connector().connect(ref)
+        if connection:
             return connection
 
 
     # connectors = {
     #     connector.__name__: connector for connector in get_connectors()}
-
-
 
     # if 'System' in connectors:
     #     return connectors['System']()
@@ -180,6 +186,62 @@ def get(ref):
             if facts:
                 add_connection_metadata(facts)
                 return facts
+
+class Bunch:
+    """a handy bunch of variables"""
+    tables = []
+
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+    def __str__(self):
+        return f'{self.__class__.__name__}\n' + '\n  '.join(
+            f'{k:{(20-len(k))*"."}}: {v!r}'
+            for k, v in self.__dict__.items()
+        )
+
+class State(dict):
+    """State of Extraction"""
+
+    def find(self, kind):
+        """Return things of a kind"""
+        cache = self.setdefault('_cache', [])
+        for thing in self.setdefault(kind, []):
+            thing_id = id(thing)
+            if thing_id not in cache:
+                cache.append(thing_id)
+                yield thing
+
+    def add(self, kind, value):
+        """Add a value of a certain kind"""
+        self.setdefault(kind, []).append(value)
+
+
+def extract(ref):
+    """Extract a reference
+
+    Extract data from a reference.
+    """
+
+    connectors = get_connectors()
+
+    # ref = State(ref=refs)
+
+    extracting = True
+    while extracting:
+        extracting = any(
+            connector().extract(ref)
+            for connector in connectors
+        )
+        # print(extracting)
+
+    return Bunch(
+        # name=ref.get('name', ref['ref']),
+        # ref=ref['ref'],
+        # tables=ref['tables'],
+        # text=ref['text'],
+    )
+
 
 def load(ref):
     """Get a Graph
