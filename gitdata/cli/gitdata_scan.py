@@ -3,7 +3,7 @@ usage: gitdata scan [options] [<ref>...]
 
 options:
     --limit <n>, -n <n>     limit number of records displayed
-    --name-columns          provide synthetic column names
+    --name-columns          provide synthetic column names (handy for csv files that do not provide a header)
     -h, --help
 """
 
