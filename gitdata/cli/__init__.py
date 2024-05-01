@@ -17,6 +17,7 @@ See 'gitdata help <command>' for more information on a specific command.
 import logging
 
 from docopt import docopt
+import sys
 
 import gitdata
 from gitdata.utils import trim
@@ -32,6 +33,10 @@ def print_help(doc):
 
 def main():
     """CLI main"""
+
+    if len(sys.argv) == 1:
+        print_help(__doc__)
+        sys.exit()
 
     args = docopt(
         __doc__,
