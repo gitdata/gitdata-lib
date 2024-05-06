@@ -14,10 +14,11 @@ The most commonly used gitdata commands are:
 See 'gitdata help <command>' for more information on a specific command.
 """
 
+import importlib
 import logging
+import sys
 
 from docopt import docopt
-import sys
 
 import gitdata
 from gitdata.utils import trim
@@ -29,6 +30,15 @@ root_logger = logging.getLogger()
 def print_help(doc):
     """Print help text"""
     print(trim(doc))
+
+
+def get_module_doc(name):
+    module_name = 'gitdata.cli.gitdata_' + name
+    try:
+        result = importlib.import_module(module_name).__doc__
+    except ModuleNotFoundError:
+        result = f'no help on topic {name!r}'
+    return result
 
 
 def main():
@@ -49,22 +59,26 @@ def main():
         root_logger.setLevel(logging.DEBUG)
 
     argv = [args['<command>']] + args['<args>']
+    command = args['<command>']
 
-    if args['<command>'] == 'get':
+    if command == 'help':
+        if args['<args>']:
+            topic = args['<args>'][0]
+            doc = get_module_doc(topic)
+        else:
+            doc = __doc__
+        print_help(doc)
+        sys.exit()
+
+    elif command == 'get':
         from gitdata.cli.gitdata_get import get, __doc__ as doc
         args = docopt(doc, argv=argv)
         get(args)
 
-    elif args['<command>'] == 'scan':
+    elif command == 'scan':
         from gitdata.cli.gitdata_scan import scan_to_console, __doc__ as doc
         args = docopt(doc, argv=argv)
         scan_to_console(args)
-
-    elif args['<command>'] in ['help', None]:
-        if args['<args>'] == ['get']:
-            from gitdata.cli.gitdata_get import __doc__ as doc
-            exit(doc)
-        exit(__doc__)
 
     else:
         exit("%r is not a gitdata command. See 'gitdata help'." % args['<command>'])

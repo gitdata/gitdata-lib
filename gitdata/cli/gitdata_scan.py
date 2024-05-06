@@ -11,7 +11,7 @@ import csv
 import os
 
 import gitdata
-from gitdata.connectors.common import load, connect
+from gitdata.connectors.common import load, connect, get_connectors
 from gitdata.connectors.http import HttpConnector
 
 
@@ -68,16 +68,66 @@ def scan(ref, args):
     return ''.join(scan_table(table) for table in as_tables(ref, args))
 
 
+# class Scanner:
+
+#     def __init__(self, ref, args):
+#         self.ref = ref
+#         self.args = args
+
+#     def __str__(self):
+#         result = [f'Scan: {self.ref}']
+#         for table in tables(self.ref):
+#             result.append(f'Table: {table.name}')
+
+class MegaConnect:
+
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+
+    @property
+    def tables(self):
+        
+        for connector in get_connectors():
+            if 'table' in connector.writes:
+                print(connector.reads)
+
+        for name in ['one', 'two']:
+            yield name
+
+
+def connect2(ref):
+    # for connector in get_connectors():
+    #     print(connector, connector.reads, connector.writes)
+    # print(ref)
+    # print([f for f in [dir(x) for x in get_connectors()]][0])
+    return MegaConnect(ref)
+
+
+def scan_table(table):
+    return str(table)
+
+
+def scan2(connection):
+    result = []
+    for table in connection.tables:
+        result.append(scan_table(table))
+        # for row in table:
+        #     for value in row:
+    return '\n'.join(result)
+
+
 def console(output):
     if output:
         print(output)
-        print()
 
 
 def scan_to_console(args):
     if args['<ref>']:
         for ref in args['<ref>']:
-            console(scan(ref, args))
+            connection = connect2(ref)
+            console(scan2(connection))
+            # console(Scanner(ref, args))
             # connection = connect(ref)
             # if connection:
             #     print(connection)
