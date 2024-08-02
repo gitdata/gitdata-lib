@@ -25,9 +25,9 @@ mariadb:
   variables:
     MYSQL_DATABASE: gitdatatest
     MYSQL_ROOT_PASSWORD: root
-    GITDATA_TEST_DATABASE_HOST: mariadb
-    GITDATA_TEST_DATABASE_USER: root
-    GITDATA_TEST_DATABASE_PASSWORD: root
+    GITDATA_TEST_MYSQL_DATABASE_HOST: mariadb
+    GITDATA_TEST_MYSQL_DATABASE_USER: root
+    GITDATA_TEST_MYSQL_DATABASE_PASSWORD: root
   script:
     - nosetests -c .noserc tests/unittests/test_database.py:TestMySQLDatabase
 
@@ -38,6 +38,6 @@ postgres:
     - postgres:latest
   variables:
     POSTGRES_PASSWORD: password
-    GITDATA_TEST_DATABASE_HOST: postgres
+    GITDATA_TEST_POSTGRES_DATABASE_HOST: postgres
   script:
     - nosetests -c .noserc tests/unittests/test_database.py:TestPostgreSQLDatabase
