@@ -663,9 +663,9 @@ class TestPostgreSQLDatabase(unittest.TestCase, DatabaseTests):
 
         self.db = db = connect(
             'postgresql',
-            host=get('GITDATA_TEST_DATABASE_HOST', 'localhost'),
-            user=get('GITDATA_TEST_DATABASE_USER', 'postgres'),
-            password=get('GITDATA_TEST_DATABASE_PASSWORD', 'password'),
+            host=get('GITDATA_TEST_POSTGRES_DATABASE_HOST', 'localhost'),
+            user=get('GITDATA_TEST_POSTGRES_DATABASE_USER', 'postgres'),
+            password=get('GITDATA_TEST_POSTGRES_DATABASE_PASSWORD', 'password'),
         )
 
         db.connect()
@@ -809,9 +809,9 @@ class TestMySQLDatabase(unittest.TestCase, DatabaseTests):
 
         self.db = connect(
             'mysql',
-            host=get('GITDATA_TEST_DATABASE_HOST', 'localhost'),
-            user=get('GITDATA_TEST_DATABASE_USER', 'testuser'),
-            passwd=get('GITDATA_TEST_DATABASE_PASSWORD', 'password'),
+            host=get('GITDATA_TEST_MYSQL_DATABASE_HOST', 'localhost'),
+            user=get('GITDATA_TEST_MYSQL_DATABASE_USER', 'testuser'),
+            passwd=get('GITDATA_TEST_MYSQL_DATABASE_PASSWORD', 'password'),
             db='gitdatatest'
         )
         self.create_cmd  = """
