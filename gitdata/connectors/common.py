@@ -6,6 +6,7 @@ import datetime
 import getpass
 import inspect
 import importlib
+import io
 import logging
 import pkgutil
 import platform
@@ -95,6 +96,16 @@ def explore(node, destination):
 #         for a in connector.reads:
 #             for b in connector.writes:
 #                 yield a, b
+
+
+class Blob(io.BytesIO):
+    """Blob"""
+
+    def __str__(self):
+        return '{:,} bytes'.format(len(self))
+
+    def __len__(self):
+        return self.getbuffer().nbytes
 
 
 class BaseConnector:

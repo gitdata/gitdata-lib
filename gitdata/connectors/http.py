@@ -9,7 +9,7 @@ import urllib.parse
 
 import requests
 
-from gitdata.connectors.common import BaseConnector
+from gitdata.connectors.common import BaseConnector, Blob
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class HttpConnector(BaseConnector):
             if r.status_code == 200:
                 return dict(
                     facts,
-                    blob=io.BytesIO(r.content)
+                    blob=Blob(r.content)
                 )
             else:
                 logger.error(

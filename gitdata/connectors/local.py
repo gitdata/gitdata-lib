@@ -3,12 +3,12 @@
 """
 
 import datetime
-import io
 import os
 
-from gitdata.connectors.common import BaseConnector
+from gitdata.connectors.common import BaseConnector, Blob
 
 fromtimestamp = datetime.datetime.fromtimestamp
+
 
 class FileConnector(BaseConnector):
 
@@ -25,7 +25,7 @@ class FileConnector(BaseConnector):
 
     def get_blobs(self):
         with open(self.ref, 'rb') as f:
-            return [io.BytesIO(f.read())]
+            return [Blob(f.read())]
 
     def get(self, ref):
         if os.path.isfile(ref):
@@ -34,7 +34,7 @@ class FileConnector(BaseConnector):
             path, filename = os.path.split(pathname)
 
             with open(ref, 'rb') as f:
-                content = io.BytesIO(f.read())
+                content = Blob(f.read())
 
             return dict(
                 ref=ref,
@@ -55,7 +55,7 @@ class FileConnector(BaseConnector):
             path, filename = os.path.split(pathname)
 
             with open(ref, 'rb') as f:
-                content = io.BytesIO(f.read())
+                content = Blob(f.read())
 
             return dict(
                 ref=ref,
