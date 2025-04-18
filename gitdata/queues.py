@@ -643,3 +643,17 @@ class Queues(object):
 
     def __str__(self):
         return str(EntityStore(self.db, Message))
+
+
+def get_queues(db=None):
+    """Returns a queues object
+    """
+    db = db or gitdata.database.connect()
+    return Queues(db)
+
+
+def queue_of(topic, db=None):
+    """Returns a queue for the given topic
+    """
+    db = db or gitdata.database.connect()
+    return get_queues(db).topic(topic)
