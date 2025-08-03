@@ -26,6 +26,8 @@ from dotenv import load_dotenv
 
 from gitdata.utils import parents, OrderedSet
 
+CONFIG_FILENAME = 'gitdata.ini'
+
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +140,7 @@ class Config:
         )
 
 
-def locate_config_file(filename='gitdata.ini', start='.'):
+def locate_config_file(filename=CONFIG_FILENAME, start='.'):
     """locate a config file
 
     First look in the current directory or above and then look
