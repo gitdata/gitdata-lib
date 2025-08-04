@@ -65,7 +65,10 @@ class Config:
         if '.' in key:
             section, option = key.split('.', 1)
         else:
-            section, option = 'settings', key
+            if '_' in key:
+                section, option = key.lower().split('_', 1)
+            else:
+                section, option = 'settings', key
 
         if self.config.has_option(section, option):
             value = self.config.get(section, option)
