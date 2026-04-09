@@ -10,7 +10,7 @@ from .common import fixval, get_type_str, AbstractStore, entify, retype
 
 valid_types = [
     'str', 'bytes', 'int', 'float', 'decimal.Decimal',
-    'datetime.date', 'datetime.datetime', 'bool', 'NoneType', 'stream',
+    'datetime.date', 'datetime.datetime', 'bool', 'NoneType',
 ]
 
 insert = (
@@ -64,12 +64,9 @@ class Sqlite3FactStore(AbstractStore):
         records = []
         for entity, attribute, value in facts:
             if value is not None:
-                value_type = None
                 if isinstance(value, io.BytesIO):
                     value = value.read()
-                    value_type = 'stream'
-                else:
-                    value_type = get_type_str(value)
+                value_type = get_type_str(value)
                 if value_type in valid_types:
                     records.append((entity, attribute, value_type, value))
                 else:
@@ -157,19 +154,14 @@ class Sqlite3FactStore(AbstractStore):
 
         keys = [k.lower() for k in entity.keys()]
         values = []
-        value_types = []
         for key in keys:
             value = entity[key]
             if isinstance(value, io.BytesIO):
                 values.append(value.read())
-                value_types.append('stream')
             else:
                 values.append(value)
-                value_types.append(get_type_str(value))
-        values = [
-            fixval(value) if value_type != 'stream' else value
-            for value, value_type in zip(values, value_types)
-        ]
+        value_types = [get_type_str(v) for v in values]
+        values = [fixval(i) for i in values]
 
         for n, atype in enumerate(value_types):
             if atype not in valid_types:

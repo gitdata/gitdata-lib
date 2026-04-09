@@ -171,7 +171,11 @@ class EntityStoreSuite:
         value = io.BytesIO(content)
         new_id = self.store.put(dict(value=value))
         entity = self.store.get(new_id)
-        self.assertEqual(entity['value'].read(), content)
+        stored = entity['value']
+        if hasattr(stored, 'read'):
+            self.assertEqual(stored.read(), content)
+        else:
+            self.assertEqual(stored, content)
 
     def test_supported_values(self):
         values = ['test', 1, Decimal('2.1')]
