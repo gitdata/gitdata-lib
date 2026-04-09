@@ -306,19 +306,15 @@ class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
     """Sqlite3 Fact Store Tests"""
 
     def setUp(self):
-        # path = tempfile.TemporaryDirectory().name
-        path = 'tmp'
-        if not os.path.exists(path):
-            os.mkdir(path)
-        pathname = os.path.join(path, 'facts')
+        self.tempdir = tempfile.TemporaryDirectory()
+        pathname = os.path.join(self.tempdir.name, '.gitdata')
         self.store = gitdata.stores.facts.Sqlite3FactStore(pathname)
         self.store.setup()
 
     def tearDown(self):
         self.store.clear()
         self.store.connection.close()
-        os.remove('tmp/facts')
-        os.rmdir('tmp/blobs')
+        self.tempdir.cleanup()
 
 
 class Sqlite3MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
@@ -335,4 +331,3 @@ class MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
     def setUp(self):
         self.store = gitdata.stores.facts.MemoryFactStore()
         self.store.setup()
-

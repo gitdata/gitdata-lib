@@ -3,6 +3,7 @@
 """
 
 import base64
+import io
 from datetime import datetime, date
 from decimal import Decimal
 
@@ -19,7 +20,8 @@ def retype(value, value_type):
         value = float(value)
 
     elif value_type in ['_io.BytesIO', 'stream']:
-        pass
+        if isinstance(value, (bytes, bytearray)):
+            value = io.BytesIO(value)
 
     elif value_type in ['decimal', 'decimal.Decimal']:
         value = Decimal(value)

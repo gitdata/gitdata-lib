@@ -7,6 +7,7 @@ options:
     -d, --debug     debug
 
 The most commonly used gitdata commands are:
+    init        initialize a local gitdata repository
     fetch       fetch data to the local reposotiry
     get         get data
     scan        scan data
@@ -69,6 +70,11 @@ def main():
             doc = __doc__
         print_help(doc)
         sys.exit()
+
+    elif command == 'init':
+        from gitdata.cli.gitdata_init import init, __doc__ as doc
+        args = docopt(doc, argv=argv)
+        init(args)
 
     elif command == 'get':
         from gitdata.cli.gitdata_get import get, __doc__ as doc
