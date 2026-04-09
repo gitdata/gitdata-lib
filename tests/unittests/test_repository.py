@@ -36,9 +36,7 @@ class TestLocalRepositorySetup(unittest.TestCase):
     def test_init(self):
         working_directory = 'tmp'
         path = working_directory + '/.gitdata'
-        if os.path.isdir(path):
-            os.rmdir(path)
-        elif os.path.isfile(path):
+        if os.path.isfile(path):
             os.remove(path)
         self.assertFalse(os.path.exists(path))
         gitdata.repositories.create_respository(working_directory)
