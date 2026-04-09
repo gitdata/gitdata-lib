@@ -171,7 +171,11 @@ class EntityStoreSuite:
         value = io.BytesIO(content)
         new_id = self.store.put(dict(value=value))
         entity = self.store.get(new_id)
-        self.assertEqual(entity['value'].read(), content)
+        stored = entity['value']
+        if hasattr(stored, 'read'):
+            self.assertEqual(stored.read(), content)
+        else:
+            self.assertEqual(stored, content)
 
     def test_supported_values(self):
         values = ['test', 1, Decimal('2.1')]
@@ -306,19 +310,42 @@ class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
     """Sqlite3 Fact Store Tests"""
 
     def setUp(self):
-        # path = tempfile.TemporaryDirectory().name
-        path = 'tmp'
-        if not os.path.exists(path):
-            os.mkdir(path)
-        pathname = os.path.join(path, 'facts')
+        self.tempdir = tempfile.TemporaryDirectory()
+        pathname = os.path.join(self.tempdir.name, '.gitdata')
         self.store = gitdata.stores.facts.Sqlite3FactStore(pathname)
         self.store.setup()
 
     def tearDown(self):
         self.store.clear()
         self.store.connection.close()
-        os.remove('tmp/facts')
-        os.rmdir('tmp/blobs')
+        self.tempdir.cleanup()
+
+    def test_store_stream_returns_bytes(self):
+        content = b'test123'
+        new_id = self.store.put(dict(value=io.BytesIO(content)))
+        entity = self.store.get(new_id)
+        self.assertIsInstance(entity['value'], bytes)
+        self.assertEqual(entity['value'], content)
+
+    def test_setup_resets_store(self):
+        new_id = self.store.put(dict(name='one'))
+        self.assertIsNotNone(self.store.get(new_id))
+        self.store.setup()
+        self.assertIsNone(self.store.get(new_id))
+
+    def test_put_unsupported_type_raises(self):
+        class Unsupported:
+            pass
+
+        with self.assertRaises(Exception):
+            self.store.put(dict(value=Unsupported()))
+
+    def test_add_unsupported_type_raises(self):
+        class Unsupported:
+            pass
+
+        with self.assertRaises(Exception):
+            self.store.add([('1', 'value', Unsupported())])
 
 
 class Sqlite3MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
@@ -328,6 +355,27 @@ class Sqlite3MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
         self.store = gitdata.stores.facts.Sqlite3FactStore(':memory:', new_uid=test_uid_maker())
         self.store.setup()
 
+    def test_store_stream_returns_bytes(self):
+        content = b'test123'
+        new_id = self.store.put(dict(value=io.BytesIO(content)))
+        entity = self.store.get(new_id)
+        self.assertIsInstance(entity['value'], bytes)
+        self.assertEqual(entity['value'], content)
+
+    def test_put_unsupported_type_raises(self):
+        class Unsupported:
+            pass
+
+        with self.assertRaises(Exception):
+            self.store.put(dict(value=Unsupported()))
+
+    def test_add_unsupported_type_raises(self):
+        class Unsupported:
+            pass
+
+        with self.assertRaises(Exception):
+            self.store.add([('1', 'value', Unsupported())])
+
 
 class MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
     """Memory Fact Store Tests"""
@@ -336,3 +384,21 @@ class MemoryFactStoreTests(EntityStoreSuite, unittest.TestCase):
         self.store = gitdata.stores.facts.MemoryFactStore()
         self.store.setup()
 
+
+class TestFactStoreFactory(unittest.TestCase):
+
+    def test_facts_of_memory(self):
+        store = gitdata.stores.facts.facts_of(':memory:')
+        self.assertIsInstance(store, gitdata.stores.facts.MemoryFactStore)
+
+    def test_facts_of_none(self):
+        store = gitdata.stores.facts.facts_of(None)
+        self.assertIsInstance(store, gitdata.stores.facts.MemoryFactStore)
+
+    def test_facts_of_file_path(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            pathname = os.path.join(tempdir, '.gitdata')
+            store = gitdata.stores.facts.facts_of(pathname)
+            self.assertIsInstance(store, gitdata.stores.facts.Sqlite3FactStore)
+            store.setup()
+            store.connection.close()

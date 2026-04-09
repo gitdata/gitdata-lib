@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - refactor secrets module into a backend-agnostic core with pluggable storage
 - add `GITDATA_ENCRYPTION_KEY` and docker `/run/secrets` key resolution for secrets
 - mask secret values by default in secrets listing APIs
+- add `gitdata init` command to initialize repositories
+- switch local repository storage to a single `.gitdata` sqlite file
 
 ## [v0.0.15] - 2025-08-03
 - add secrets module stub

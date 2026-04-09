@@ -3,11 +3,9 @@
 """
 
 import io
-import os
 import sqlite3
 
 import gitdata
-import gitdata.buckets
 from .common import fixval, get_type_str, AbstractStore, entify, retype
 
 valid_types = [
@@ -42,11 +40,6 @@ class Sqlite3FactStore(AbstractStore):
         self.database = database
         self.new_uid = new_uid
         self.connection = sqlite3.Connection(database, *args, **kwargs)
-        if database == ':memory:':
-            self.bucket = gitdata.buckets.MemoryBucket(id_factory=new_uid)
-        else:
-            path = os.path.join(os.path.dirname(database or '.'), 'blobs')
-            self.bucket = gitdata.buckets.FileBucket(path, id_factory=new_uid)
 
     def setup(self):
         """Set up the persistent data store"""
@@ -72,7 +65,7 @@ class Sqlite3FactStore(AbstractStore):
         for entity, attribute, value in facts:
             if value is not None:
                 if isinstance(value, io.BytesIO):
-                    value = self.bucket.puts(value)
+                    value = value.read()
                 value_type = get_type_str(value)
                 if value_type in valid_types:
                     records.append((entity, attribute, value_type, value))
@@ -159,15 +152,16 @@ class Sqlite3FactStore(AbstractStore):
     def put(self, entity):
         """stores an entity"""
 
-        def bucketize(v):
-            if isinstance(v, io.BytesIO):
-                return self.bucket.puts(v)
-            return v
-
         keys = [k.lower() for k in entity.keys()]
-        values = [bucketize(entity[k]) for k in keys]
+        values = []
+        for key in keys:
+            value = entity[key]
+            if isinstance(value, io.BytesIO):
+                values.append(value.read())
+            else:
+                values.append(value)
         value_types = [get_type_str(v) for v in values]
-        values = [fixval(i) for i in values]  # same fix as above
+        values = [fixval(i) for i in values]
 
         for n, atype in enumerate(value_types):
             if atype not in valid_types:
@@ -186,13 +180,10 @@ class Sqlite3FactStore(AbstractStore):
 
     def get(self, uid):
         """get an entity from the entity store"""
-        def unbucketize(fact):
-            s, p, t, o = fact
-            return s, p, t, self.bucket.gets(o, o)
         select = 'select * from facts where entity=?'
         cursor = self.connection.cursor()
         cursor.execute(select, (uid,))
-        facts = list(map(unbucketize, cursor.fetchall()))
+        facts = cursor.fetchall()
         result = entify(facts)
         return result
 
@@ -205,7 +196,6 @@ class Sqlite3FactStore(AbstractStore):
 
     def clear(self):
         """delete all facts"""
-        self.bucket.clear()
         with self.connection as connection:
             cursor = connection.cursor()
             cursor.execute('delete from facts')
@@ -290,8 +280,4 @@ def facts_of(location, new_uid=gitdata.utils.new_uid):
     """Return a fact store for a location"""
     if location == ':memory:' or location is None:
         return MemoryFactStore(new_uid=new_uid)
-    if os.path.isdir(location):
-        return Sqlite3FactStore(
-            os.path.join(location, 'facts'), new_uid=new_uid
-        )
-    raise Exception('fatal: not a GitData respository')
+    return Sqlite3FactStore(location, new_uid=new_uid)

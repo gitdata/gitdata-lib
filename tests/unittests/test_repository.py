@@ -36,16 +36,49 @@ class TestLocalRepositorySetup(unittest.TestCase):
     def test_init(self):
         working_directory = 'tmp'
         path = working_directory + '/.gitdata'
-        if os.path.isdir(path):
-            os.rmdir(path)
+        if os.path.isfile(path):
+            os.remove(path)
         self.assertFalse(os.path.exists(path))
         gitdata.repositories.create_respository(working_directory)
         try:
             repository = gitdata.repositories.Repository(working_directory)
-            self.assertTrue(os.path.exists(path))
-            self.assertTrue(os.path.exists(path + '/facts'))
+            self.assertTrue(os.path.isfile(path))
         finally:
             del repository
+            gitdata.repositories.remove_respository(working_directory)
+
+    def test_init_repository_is_idempotent(self):
+        working_directory = 'tmp'
+        path = working_directory + '/.gitdata'
+        gitdata.repositories.remove_respository(working_directory)
+        if not os.path.exists(working_directory):
+            os.mkdir(working_directory)
+
+        try:
+            repository_path, created = gitdata.repositories.init_repository(working_directory)
+            self.assertTrue(created)
+            self.assertEqual(repository_path, path)
+            self.assertTrue(os.path.exists(path))
+
+            repository_path, created = gitdata.repositories.init_repository(working_directory)
+            self.assertFalse(created)
+            self.assertEqual(repository_path, path)
+        finally:
+            gitdata.repositories.remove_respository(working_directory)
+
+    def test_init_repository_from_file_path(self):
+        working_directory = 'tmp'
+        path = working_directory + '/.gitdata'
+        gitdata.repositories.remove_respository(working_directory)
+        if not os.path.exists(working_directory):
+            os.mkdir(working_directory)
+
+        try:
+            repository_path, created = gitdata.repositories.init_repository(path)
+            self.assertTrue(created)
+            self.assertEqual(repository_path, path)
+            self.assertTrue(os.path.isfile(path))
+        finally:
             gitdata.repositories.remove_respository(working_directory)
 
 

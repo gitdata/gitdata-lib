@@ -7,7 +7,6 @@ import getpass
 import logging
 import os
 import platform
-import shutil
 
 from gitdata.connectors.common import (
     get
@@ -34,19 +33,34 @@ def locate_repository(dirname='.gitdata', start='.'):
 def create_respository(pathname):
     """Create a new GitData repository"""
     if os.path.isdir(pathname):
+        init_repository(pathname)
+
+
+def init_repository(pathname='.'):
+    """Initialize a GitData repository and return path + created flag."""
+    if os.path.isdir(pathname):
         repository_path = os.path.join(pathname, '.gitdata')
-        if not os.path.exists(repository_path):
-            os.mkdir(repository_path)
-            repository = Repository(pathname)
-            repository.setup()
+    else:
+        repository_path = pathname
+        parent = os.path.dirname(os.path.abspath(repository_path)) or '.'
+        if not os.path.isdir(parent):
+            msg = 'directory does not exist: {!r}'
+            raise ValueError(msg.format(parent))
+
+    if os.path.exists(repository_path):
+        return repository_path, False
+
+    repository = Repository(repository_path)
+    repository.setup()
+    return repository_path, True
 
 
 def remove_respository(pathname):
     """Remove GitData repository"""
     if os.path.isdir(pathname):
         repository_path = os.path.join(pathname, '.gitdata')
-        if os.path.exists(repository_path):
-            shutil.rmtree(repository_path)
+        if os.path.isfile(repository_path):
+            os.remove(repository_path)
 
 
 def add_connection_metadata(facts, **kwargs):
@@ -66,8 +80,10 @@ class Repository:
     def __init__(self, location=':memory:'):
         if location == ':memory:':
             self.location = location
-        else:
+        elif os.path.isdir(location):
             self.location = os.path.join(location, '.gitdata')
+        else:
+            self.location = location
         self.graph = Graph(self.location)
 
     def __del__(self):
