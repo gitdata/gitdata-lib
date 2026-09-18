@@ -5,6 +5,7 @@ import copy
 from dataclasses import dataclass
 
 from gitdata.encryption import get_encrypter
+from gitdata.stores.entities import store_of
 
 
 DEFAULT_ENCRYPTION_KEY_NAME = 'gitdata_encryption_key'
@@ -52,6 +53,86 @@ class InMemorySecretsStorage:
 
     def __len__(self):
         return len(self._records)
+
+
+def ensure_entity_schema(db):
+    db(
+        'create table if not exists entities ('
+        '  id integer NOT NULL PRIMARY KEY autoincrement,'
+        '  kind varchar(100) NOT NULL'
+        ')'
+    )
+    db(
+        'create table if not exists attributes ('
+        '  id integer NOT NULL PRIMARY KEY autoincrement,'
+        '  kind varchar(100) NOT NULL,'
+        '  row_id integer not null,'
+        '  attribute varchar(100),'
+        '  datatype varchar(30),'
+        '  value mediumtext'
+        ')'
+    )
+
+
+def _record_name(record):
+    if record is None:
+        return None
+    if isinstance(record, dict):
+        return record.get('name')
+    return getattr(record, 'name', None)
+
+
+def _record_expiry(record):
+    if record is None:
+        return None
+    if isinstance(record, dict):
+        return record.get('expiry')
+    return getattr(record, 'expiry', None)
+
+
+class EntityStoreSecretsStorage:
+    """EntityStore backend for secrets."""
+
+    def __init__(self, db):
+        ensure_entity_schema(db)
+        self.store = store_of(dict, db=db, name='secret')
+
+    def _as_secret(self, record):
+        if record is None:
+            return None
+        return Secret(
+            name=_record_name(record),
+            value=_record_value(record),
+            expiry=_record_expiry(record),
+        )
+
+    def put(self, record):
+        name = _record_name(record)
+        entity = {
+            'name': name,
+            'value': _record_value(record),
+            'expiry': _record_expiry(record),
+        }
+        existing = self.store.first(name=name)
+        if existing is not None:
+            entity['_id'] = existing['_id']
+        self.store.put(entity)
+        self.store.db.commit()
+        return record
+
+    def first(self, **kv):
+        return self._as_secret(self.store.first(**kv))
+
+    def delete(self, **kv):
+        self.store.delete(**kv)
+        self.store.db.commit()
+
+    def __iter__(self):
+        for record in self.store:
+            yield self._as_secret(record)
+
+    def __len__(self):
+        return len(self.store)
 
 
 def _to_key_bytes(value):
@@ -137,7 +218,7 @@ class Secrets:
     """
 
     def __init__(self, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME):
-        self.storage = storage or InMemorySecretsStorage()
+        self.storage = InMemorySecretsStorage() if storage is None else storage
         self.encrypter = get_secrets_encrypter(key=key, key_name=key_name)
 
     def _decrypt_value(self, value):
@@ -226,13 +307,15 @@ class Secrets:
         return len(self.storage)
 
 
-def get_secrets(key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME):
+def get_secrets(key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME, db=None):
+    if storage is None and db is not None:
+        storage = EntityStoreSecretsStorage(db)
     return Secrets(key=key, storage=storage, key_name=key_name)
 
 
-def get_secret(name, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME):
-    return get_secrets(key=key, storage=storage, key_name=key_name).get(name)
+def get_secret(name, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME, db=None):
+    return get_secrets(key=key, storage=storage, key_name=key_name, db=db).get(name)
 
 
-def set_secret(name, value, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME):
-    return get_secrets(key=key, storage=storage, key_name=key_name).set(name, value)
+def set_secret(name, value, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME, db=None):
+    return get_secrets(key=key, storage=storage, key_name=key_name, db=db).set(name, value)

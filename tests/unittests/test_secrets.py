@@ -5,6 +5,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import gitdata.database
+import gitdata.repositories
 from gitdata.secrets import (
     DEFAULT_ENCRYPTION_KEY_NAME,
     ENCRYPTION_KEY_ENV_VAR,
@@ -111,3 +113,54 @@ class SecretsTests(unittest.TestCase):
         with patch.dict(os.environ, {ENCRYPTION_KEY_ENV_VAR: ''}, clear=False):
             with self.assertRaises(SecretsKeyMissingException):
                 get_secrets(None, key_name='missing_encryption_key_name')
+
+    def test_entity_store_set_get_and_upsert(self):
+        db = gitdata.database.setup_test_database()
+        try:
+            secrets = get_secrets(self.key, db=db)
+            secrets.set('token', 'one')
+            secrets.set('token', 'two')
+            self.assertEqual(secrets.get('token'), 'two')
+            self.assertEqual(secrets.keys(), ['token'])
+            self.assertEqual(len(secrets), 1)
+            records = secrets.list()
+            self.assertEqual(records[0].name, 'token')
+            self.assertEqual(records[0].value, '****')
+            secrets.delete('token')
+            self.assertIsNone(secrets.get('token'))
+            self.assertEqual(len(secrets), 0)
+        finally:
+            db.close()
+
+    def test_entity_store_persists_across_connections(self):
+        handle = tempfile.NamedTemporaryFile(suffix='.gitdata', delete=False)
+        path = handle.name
+        handle.close()
+        try:
+            db = gitdata.database.connect(database=path)
+            secrets = get_secrets(self.key, db=db)
+            secrets.set('token', 'abc')
+            db.close()
+
+            db = gitdata.database.connect(database=path)
+            secrets = get_secrets(self.key, db=db)
+            self.assertEqual(secrets.get('token'), 'abc')
+            db.close()
+        finally:
+            os.remove(path)
+
+    def test_repository_secrets_persist(self):
+        tmpdir = tempfile.mkdtemp()
+        try:
+            path, created = gitdata.repositories.init_repository(tmpdir)
+            self.assertTrue(created)
+            repository = gitdata.repositories.Repository(path)
+            secrets = repository.secrets(self.key)
+            secrets.set('gitlab-token', 'secret-value')
+
+            repository = gitdata.repositories.Repository(path)
+            secrets = repository.secrets(self.key)
+            self.assertEqual(secrets.get('gitlab-token'), 'secret-value')
+        finally:
+            gitdata.repositories.remove_respository(tmpdir)
+            os.rmdir(tmpdir)

@@ -8,10 +8,12 @@ import logging
 import os
 import platform
 
+import gitdata.database
 from gitdata.connectors.common import (
     get
 )
 from gitdata.graphs import Graph
+from gitdata.secrets import get_secrets
 from gitdata.utils import parents
 
 
@@ -91,6 +93,12 @@ class Repository:
 
     def setup(self):
         self.graph.setup()
+
+    def secrets(self, key=None, key_name=None):
+        db = gitdata.database.connect(database=self.location, isolation_level=None)
+        if key_name is None:
+            return get_secrets(key=key, db=db)
+        return get_secrets(key=key, db=db, key_name=key_name)
 
     def fetch(self, ref):
         """Fetch a ref"""

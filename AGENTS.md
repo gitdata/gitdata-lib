@@ -1,0 +1,5 @@
+# gitdata-lib
+
+- Default branch is `master`. Do not rebase; merge the target branch.
+- Secrets persist in the local `.gitdata` sqlite file via EntityStore (`entities`/`attributes`). Do not run `sqlite3_setup.sql` on an existing repo (it drops tables).
+- CLI: `gitdata secrets` (`list`/`ls`, `get`, `set`/`add`, `delete`/`rm`, `keygen`). Key from `--key`, `--key-file`, `GITDATA_ENCRYPTION_KEY`, or `/run/secrets/gitdata_encryption_key`. Never store the key in `.gitdata`.

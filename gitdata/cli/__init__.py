@@ -11,6 +11,7 @@ The most commonly used gitdata commands are:
     fetch       fetch data to the local reposotiry
     get         get data
     scan        scan data
+    secrets     manage repository secrets
 
 See 'gitdata help <command>' for more information on a specific command.
 """
@@ -34,6 +35,8 @@ def print_help(doc):
 
 
 def get_module_doc(name):
+    if name == 'secret':
+        name = 'secrets'
     module_name = 'gitdata.cli.gitdata_' + name
     try:
         result = importlib.import_module(module_name).__doc__
@@ -85,6 +88,11 @@ def main():
         from gitdata.cli.gitdata_scan import scan_to_console, __doc__ as doc
         args = docopt(doc, argv=argv)
         scan_to_console(args)
+
+    elif command in ('secrets', 'secret'):
+        from gitdata.cli.gitdata_secrets import secrets, __doc__ as doc
+        args = docopt(doc, argv=argv)
+        secrets(args)
 
     else:
         exit("%r is not a gitdata command. See 'gitdata help'." % args['<command>'])
