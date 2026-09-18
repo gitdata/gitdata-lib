@@ -1,15 +1,15 @@
 """
-usage: gitdata secrets list [options]
-       gitdata secrets ls [options]
-       gitdata secrets get [options] <name>
-       gitdata secrets set [options] <name> <value>
-       gitdata secrets add [options] <name> <value>
-       gitdata secrets delete [options] <name>
-       gitdata secrets rm [options] <name>
-       gitdata secrets status [options] [<names>...]
-       gitdata secrets resolve [options] <names>...
-       gitdata secrets clear [options]
-       gitdata secrets keygen [options]
+usage: gitdata secret list [options]
+       gitdata secret ls [options]
+       gitdata secret get [options] <name>
+       gitdata secret set [options] <name> <value>
+       gitdata secret add [options] <name> <value>
+       gitdata secret delete [options] <name>
+       gitdata secret rm [options] <name>
+       gitdata secret status [options] [<names>...]
+       gitdata secret resolve [options] <names>...
+       gitdata secret clear [options]
+       gitdata secret keygen [options]
 
 Share handoff: a shared .gitdata without the key cannot be read.
 Recipients re-set values under the same names with their own key.

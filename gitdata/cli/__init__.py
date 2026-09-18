@@ -11,7 +11,7 @@ The most commonly used gitdata commands are:
     fetch       fetch data to the local reposotiry
     get         get data
     scan        scan data
-    secrets     manage repository secrets
+    secret      manage repository secrets
 
 See 'gitdata help <command>' for more information on a specific command.
 """
@@ -89,8 +89,9 @@ def main():
         args = docopt(doc, argv=argv)
         scan_to_console(args)
 
-    elif command in ('secrets', 'secret'):
+    elif command in ('secret', 'secrets'):
         from gitdata.cli.gitdata_secrets import secrets, __doc__ as doc
+        argv[0] = 'secret'
         args = docopt(doc, argv=argv)
         secrets(args)
 
