@@ -12,6 +12,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - persist secrets in the local `.gitdata` repository via EntityStore
 - add `gitdata secrets` command to list, get, set, and delete secrets
 - add secrets resolve API that hard-fails listing missing names
+- add `gitdata secrets status`, `resolve`, and `clear` for share handoff
 - add `gitdata init` command to initialize repositories
 - switch local repository storage to a single `.gitdata` sqlite file
 

@@ -6,19 +6,28 @@ usage: gitdata secrets list [options]
        gitdata secrets add [options] <name> <value>
        gitdata secrets delete [options] <name>
        gitdata secrets rm [options] <name>
+       gitdata secrets status [options] [<names>...]
+       gitdata secrets resolve [options] <names>...
+       gitdata secrets clear [options]
        gitdata secrets keygen [options]
+
+Share handoff: a shared .gitdata without the key cannot be read.
+Recipients re-set values under the same names with their own key.
 
 options:
     -h, --help
     -k --key=<val>       Encryption key
     --key-file=<path>    Read encryption key from file
+    --prompt             Prompt to set missing secrets (CLI only)
+    -f --force           Required to clear all secret values
 """
 
+import getpass
 import sys
 
 from gitdata.encryption import generate_key
 from gitdata.repositories import Repository, locate_repository
-from gitdata.secrets import SecretsKeyMissingException
+from gitdata.secrets import MissingSecrets, SecretsKeyMissingException
 
 
 def _resolve_key(args):
@@ -36,6 +45,10 @@ def _require_repository():
     if not path:
         raise SystemExit('fatal: not a gitdata repository')
     return Repository(path)
+
+
+def _missing_exit(names):
+    raise SystemExit('fatal: missing secrets: {}'.format(', '.join(names)))
 
 
 def secrets(args):
@@ -77,3 +90,40 @@ def secrets(args):
             raise SystemExit('fatal: unknown secret {!r}'.format(name))
         manager.delete(name)
         print('secret deleted: {}'.format(name))
+
+    elif args['status']:
+        names = args.get('<names>') or []
+        if names:
+            for name in names:
+                state = 'set' if manager.exists(name) else 'missing'
+                print('{}\t{}'.format(name, state))
+        else:
+            keys = manager.keys()
+            if not keys:
+                print('secrets: none')
+            else:
+                print('secrets: {} set'.format(len(keys)))
+                for name in keys:
+                    print(name)
+
+    elif args['resolve']:
+        names = args['<names>']
+        try:
+            manager.resolve(names)
+        except MissingSecrets as error:
+            if not args.get('--prompt'):
+                _missing_exit(error.names)
+            for name in error.names:
+                value = getpass.getpass('{}: '.format(name))
+                if value:
+                    manager.set(name, value)
+            try:
+                manager.resolve(names)
+            except MissingSecrets as retry_error:
+                _missing_exit(retry_error.names)
+
+    elif args['clear']:
+        if not args.get('--force'):
+            raise SystemExit('fatal: use --force to clear all secret values')
+        manager.clear()
+        print('secrets cleared')
