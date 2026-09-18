@@ -13,6 +13,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - add `gitdata secrets` command to list, get, set, and delete secrets
 - add secrets resolve API that hard-fails listing missing names
 - add `gitdata secrets status`, `resolve`, and `clear` for share handoff
+- keep secret values out of logs, HTTP facts, and routine CLI output
 - add `gitdata init` command to initialize repositories
 - switch local repository storage to a single `.gitdata` sqlite file
 

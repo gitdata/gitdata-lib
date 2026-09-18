@@ -208,6 +208,32 @@ class SecretsTests(unittest.TestCase):
             with self.assertRaises(SecretsKeyMissingException):
                 resolve_secrets(['gitlab-token'], key=None, key_name='missing_encryption_key_name')
 
+    def test_masked_views_never_include_plaintext(self):
+        secrets = get_secrets(self.key)
+        secrets.set('gitlab-token', 'super-secret-value')
+        for record in secrets.list():
+            self.assertEqual(record.value, '****')
+            self.assertNotEqual(record.value, 'super-secret-value')
+        for record in secrets:
+            self.assertEqual(record.value, '****')
+        self.assertEqual(secrets.first('gitlab-token').value, '****')
+        self.assertNotIn('super-secret-value', str(secrets.list()))
+
+    def test_missing_secret_errors_never_include_values(self):
+        secrets = get_secrets(self.key)
+        secrets.set('gitlab-token', 'super-secret-value')
+        with self.assertRaises(MissingSecrets) as ctx:
+            secrets.resolve(['gitlab-token', 'db-password'])
+        message = str(ctx.exception)
+        self.assertIn('db-password', message)
+        self.assertNotIn('super-secret-value', message)
+
+    def test_missing_key_error_never_includes_key_material(self):
+        with patch.dict(os.environ, {ENCRYPTION_KEY_ENV_VAR: ''}, clear=False):
+            with self.assertRaises(SecretsKeyMissingException) as ctx:
+                get_secrets(None, key_name='missing_encryption_key_name')
+        self.assertNotIn(self.key.decode(), str(ctx.exception))
+
     def test_resolve_wrong_key_treated_as_missing(self):
         secrets = get_secrets(self.key)
         secrets.set('gitlab-token', 'token-value')

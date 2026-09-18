@@ -3,10 +3,12 @@
 """
 
 import unittest
+from unittest.mock import patch, Mock
 
 import gitdata.connectors
 from gitdata.connectors.common import get
 from gitdata.connectors import extract
+from gitdata.connectors.http import HttpConnector, redact_url
 
 # class TestConnectors(unittest.TestCase):
 
@@ -139,3 +141,30 @@ class TestExtract(unittest.TestCase):
     def test_extract_csv(self):
         t = extract('examples/locations.csv')
         # self.assertEqual(t.filename, 'locations.csv')
+
+
+class TestHttpRedaction(unittest.TestCase):
+
+    def test_redact_url(self):
+        self.assertEqual(
+            redact_url('https://user:secret-pass@example.com/path'),
+            'https://user:***@example.com/path',
+        )
+        self.assertEqual(
+            redact_url('https://example.com/path'),
+            'https://example.com/path',
+        )
+
+    def test_get_omits_password_from_facts(self):
+        response = Mock()
+        response.status_code = 200
+        response.content = b'ok'
+        connector = HttpConnector()
+        with patch('gitdata.connectors.http.requests.get', return_value=response) as mocked:
+            result = connector.get('https://user:secret-pass@example.com/file.json')
+        mocked.assert_called_once_with('https://user:secret-pass@example.com/file.json')
+        self.assertNotIn('password', result)
+        self.assertNotIn('secret-pass', result['url'])
+        self.assertNotIn('secret-pass', result['endpoint'])
+        self.assertNotIn('secret-pass', result['netloc'])
+        self.assertEqual(result['username'], 'user')

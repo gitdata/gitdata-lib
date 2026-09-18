@@ -6,3 +6,4 @@
 - `status` prints names only. `resolve` hard-fails with missing names unless `--prompt`. `clear` requires `--force`.
 - Share handoff: a shared `.gitdata` without the key fails closed. Recipients re-set values under the same names with their own key.
 - Connections resolve secrets via `Secrets.resolve` / `resolve_secrets`. Hard-fail on missing names (`MissingSecrets`); no library prompts.
+- Connectors resolve secrets in-process only. Do not attach secret values to graph, scan, fetch artifacts, logs, or exception messages. `list`/`status` are names only; `get` may print a value.
