@@ -17,6 +17,15 @@ class SecretsKeyMissingException(Exception):
     """Raised when secrets encryption key is missing."""
 
 
+class MissingSecrets(Exception):
+    """Raised when one or more requested secrets cannot be resolved."""
+
+    def __init__(self, names):
+        self.names = list(names)
+        message = 'missing secrets: {}'.format(', '.join(self.names))
+        super().__init__(message)
+
+
 @dataclass
 class Secret:
     """Simple secret record."""
@@ -250,6 +259,31 @@ class Secrets:
             return None
         return self._decrypt_value(_record_value(record))
 
+    def resolve(self, names):
+        requested = []
+        seen = set()
+        for name in names:
+            if name in seen:
+                continue
+            seen.add(name)
+            requested.append(name)
+
+        resolved = {}
+        missing = []
+        for name in requested:
+            record = self.storage.first(name=name)
+            if record is None:
+                missing.append(name)
+                continue
+            try:
+                resolved[name] = self._decrypt_value(_record_value(record))
+            except Exception:
+                missing.append(name)
+
+        if missing:
+            raise MissingSecrets(sorted(missing))
+        return resolved
+
     def delete(self, name):
         self.storage.delete(name=name)
 
@@ -319,3 +353,7 @@ def get_secret(name, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAM
 
 def set_secret(name, value, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME, db=None):
     return get_secrets(key=key, storage=storage, key_name=key_name, db=db).set(name, value)
+
+
+def resolve_secrets(names, key=None, storage=None, key_name=DEFAULT_ENCRYPTION_KEY_NAME, db=None):
+    return get_secrets(key=key, storage=storage, key_name=key_name, db=db).resolve(names)

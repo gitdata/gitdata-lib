@@ -7,13 +7,16 @@ from unittest.mock import patch
 
 import gitdata.database
 import gitdata.repositories
+from gitdata.encryption import generate_key
 from gitdata.secrets import (
     DEFAULT_ENCRYPTION_KEY_NAME,
     ENCRYPTION_KEY_ENV_VAR,
+    MissingSecrets,
     Secret,
     SecretsKeyMissingException,
     get_encryption_key,
     get_secrets,
+    resolve_secrets,
 )
 
 
@@ -164,3 +167,52 @@ class SecretsTests(unittest.TestCase):
         finally:
             gitdata.repositories.remove_respository(tmpdir)
             os.rmdir(tmpdir)
+
+    def test_resolve_all_present(self):
+        secrets = get_secrets(self.key)
+        secrets.set('gitlab-token', 'token-value')
+        secrets.set('db-password', 'pw-value')
+        resolved = secrets.resolve(['gitlab-token', 'db-password'])
+        self.assertEqual(resolved, {
+            'gitlab-token': 'token-value',
+            'db-password': 'pw-value',
+        })
+        self.assertEqual(
+            resolve_secrets(['gitlab-token'], key=self.key, storage=secrets.storage),
+            {'gitlab-token': 'token-value'},
+        )
+
+    def test_resolve_empty_names(self):
+        secrets = get_secrets(self.key)
+        self.assertEqual(secrets.resolve([]), {})
+
+    def test_resolve_one_missing(self):
+        secrets = get_secrets(self.key)
+        secrets.set('gitlab-token', 'token-value')
+        with self.assertRaises(MissingSecrets) as ctx:
+            secrets.resolve(['gitlab-token', 'db-password'])
+        self.assertEqual(ctx.exception.names, ['db-password'])
+        self.assertIn('db-password', str(ctx.exception))
+        self.assertNotIn('token-value', str(ctx.exception))
+
+    def test_resolve_several_missing(self):
+        secrets = get_secrets(self.key)
+        secrets.set('keep', 'keep-value')
+        with self.assertRaises(MissingSecrets) as ctx:
+            secrets.resolve(['zeta', 'keep', 'alpha'])
+        self.assertEqual(ctx.exception.names, ['alpha', 'zeta'])
+        self.assertNotIn('keep-value', str(ctx.exception))
+
+    def test_resolve_missing_key(self):
+        with patch.dict(os.environ, {ENCRYPTION_KEY_ENV_VAR: ''}, clear=False):
+            with self.assertRaises(SecretsKeyMissingException):
+                resolve_secrets(['gitlab-token'], key=None, key_name='missing_encryption_key_name')
+
+    def test_resolve_wrong_key_treated_as_missing(self):
+        secrets = get_secrets(self.key)
+        secrets.set('gitlab-token', 'token-value')
+        other = get_secrets(generate_key(), storage=secrets.storage)
+        with self.assertRaises(MissingSecrets) as ctx:
+            other.resolve(['gitlab-token'])
+        self.assertEqual(ctx.exception.names, ['gitlab-token'])
+        self.assertNotIn('token-value', str(ctx.exception))
