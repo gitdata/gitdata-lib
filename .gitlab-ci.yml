@@ -16,6 +16,7 @@ general:
     GITDATA_TEST_DATABASE_HOST: postgres
   script:
     - nosetests -c .noserc gitdata $(ls tests/unittests/test_*.py | grep -v database)
+    - nosetests -c .noserc tests/unittests/test_database_oracle.py
 
 mariadb:
   stage: test

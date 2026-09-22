@@ -163,11 +163,12 @@ class Database:
             elif many and len(args) >= 1 and hasattr(args[0], 'items'):
                 # a dict-like thing
                 placeholders = {key: ':%s' % key for key in args[0]}
-                cmd = command % placeholders, args
+                cmd = command % placeholders, list(args)
             elif len(args) >= 1 and issequenceform(args[0]):
                 # a list of tuple-like things
                 placeholders = [':%d' % (n+1) for n in range(len(args[0]))]
-                cmd = command % tuple(placeholders), args[0]
+                params = list(args) if many else args[0]
+                cmd = command % tuple(placeholders), params
             else:
                 # just one tuple-like thing
                 placeholders = [':%d' % (n+1) for n in range(len(args))]
