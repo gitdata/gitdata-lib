@@ -5,14 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.0.16] - 2026-09-19
 - add initial encryption module and unit tests
 - refactor secrets module into a backend-agnostic core with pluggable storage
 - add `GITDATA_ENCRYPTION_KEY` and docker `/run/secrets` key resolution for secrets
 - mask secret values by default in secrets listing APIs
 - persist secrets in the local `.gitdata` repository via EntityStore
-- add `gitdata secrets` command to list, get, set, and delete secrets
+- add `gitdata secret` command to list, get, set, and delete secrets
 - add secrets resolve API that hard-fails listing missing names
-- add `gitdata secrets status`, `resolve`, and `clear` for share handoff
+- add `gitdata secret status`, `resolve`, and `clear` for share handoff
 - keep secret values out of logs, HTTP facts, and routine CLI output
 - rename CLI command to `gitdata secret` (`secrets` remains an alias)
 - add `gitdata init` command to initialize repositories
