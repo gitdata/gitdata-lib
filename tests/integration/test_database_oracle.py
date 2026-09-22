@@ -95,8 +95,14 @@ class TestOracleDatabase(unittest.TestCase):
             self.db.get_column_names(self.table_name),
             ('id', 'display_name', 'amount'),
         )
-        self.assertIn('gitdata_test', self.db.get_schema_names())
-        self.assertIn('freepdb1', self.db.get_database_names())
+        self.assertIn(
+            os.environ['GITDATA_TEST_ORACLE_USER'].lower(),
+            self.db.get_schema_names(),
+        )
+        self.assertIn(
+            os.environ['GITDATA_TEST_ORACLE_SERVICE_NAME'].lower(),
+            self.db.get_database_names(),
+        )
 
     def test_quoted_metadata_names_round_trip_to_column_lookup(self):
         self.db('''
