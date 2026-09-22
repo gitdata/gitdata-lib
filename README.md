@@ -4,6 +4,23 @@ Data Wrangling for Everyone.
 GitData is a fast, scalable, distributed data exploration system
 with a rich set of commands that provide ways to gather, manage and query data in an unusually straightforward way.
 
+## Running the complete test suite locally
+
+Docker is the only host dependency for the complete Python 3.9 test matrix:
+
+```bash
+bash tests/run_with_docker.sh
+```
+
+The runner builds a disposable test image, runs the general and SQLite suites,
+and then starts MariaDB, PostgreSQL, and Oracle Free Lite one at a time. Each
+database container and network is removed before the next service starts and is
+also cleaned up if a test fails.
+
+The service images are pinned by digest. They can be replaced without editing
+the script by setting `GITDATA_TEST_MARIADB_IMAGE`,
+`GITDATA_TEST_POSTGRES_IMAGE`, or `GITDATA_TEST_ORACLE_IMAGE`.
+
 ## Oracle Database
 
 Oracle support uses the Python DB-API driver `python-oracledb`, which defaults
