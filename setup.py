@@ -30,6 +30,9 @@ setuptools.setup(
         ]
     },
     install_requires=requires,
+    extras_require={
+        'oracle': ['oracledb>=1.3,<4'],
+    },
     classifiers=[
         'Development Status :: 1 - Planning',
         'Environment :: Console',

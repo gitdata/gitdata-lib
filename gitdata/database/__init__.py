@@ -70,5 +70,18 @@ def connect(engine='sqlite3', **kwargs):
     elif engine == 'postgresql':
         return PostgreSQLDatabase(**kwargs)
 
+    elif engine == 'oracle':
+        try:
+            from .oracle import OracleDatabase
+            return OracleDatabase(**kwargs)
+        except ImportError as error:
+            if getattr(error, 'name', None) == 'oracledb' or \
+                    "'oracledb'" in str(error):
+                raise ImportError(
+                    "Oracle support requires the optional dependency; "
+                    "install it with 'pip install gitdata-lib[oracle]'"
+                ) from error
+            raise
+
     else:
         raise UnknownDatabaseException

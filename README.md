@@ -3,3 +3,49 @@ Data Wrangling for Everyone.
 
 GitData is a fast, scalable, distributed data exploration system
 with a rich set of commands that provide ways to gather, manage and query data in an unusually straightforward way.
+
+## Oracle Database
+
+Oracle support uses the Python DB-API driver `python-oracledb`, which defaults
+to Thin mode. The adapter does not initialize Thick mode, so Oracle Instant
+Client is not required. The driver is optional and is loaded only when an
+Oracle connection is requested:
+
+```bash
+pip install 'gitdata-lib[oracle]'
+```
+
+Connect with an Oracle service name:
+
+```python
+import os
+
+from gitdata.database import connect
+
+db = connect(
+    'oracle',
+    host='127.0.0.1',
+    port=1521,
+    service_name='FREEPDB1',
+    user='app',
+    password=os.environ['ORACLE_PASSWORD'],
+)
+
+rows = list(db('SELECT 1 FROM dual'))
+```
+
+A complete `dsn` can be supplied instead of `host`, `port`, and
+`service_name`. Installing `gitdata-lib` without the `oracle` extra does not
+install or import `python-oracledb`; requesting an Oracle connection in that
+case reports the extra that must be installed.
+
+The Oracle integration tests use these environment variables:
+
+- `GITDATA_TEST_ORACLE_USER`
+- `GITDATA_TEST_ORACLE_PASSWORD`
+- `GITDATA_TEST_ORACLE_SERVICE_NAME`
+- `GITDATA_TEST_ORACLE_HOST` (defaults to `127.0.0.1`)
+- `GITDATA_TEST_ORACLE_PORT` (defaults to `1521`)
+
+They have been exercised against Oracle Free using the
+`container-registry.oracle.com/database/free:latest` container image.
