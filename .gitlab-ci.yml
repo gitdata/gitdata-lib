@@ -9,20 +9,17 @@ before_script:
 general:
   stage: test
   image: python:3.9
-  services:
-    - postgres:latest
-  variables:
-    POSTGRES_PASSWORD: password
-    GITDATA_TEST_DATABASE_HOST: postgres
   script:
     - nosetests -c .noserc gitdata $(ls tests/unittests/test_*.py | grep -v database)
     - nosetests -c .noserc tests/unittests/test_database_oracle.py
+    - nosetests -c .noserc tests/unittests/test_database.py:TestSqlite3Database
 
 mariadb:
   stage: test
   image: python:3.9
   services:
-    - mariadb:10.7
+    - name: mariadb:10.7@sha256:9a48ac9f196f3d4fd6fea2cab59a49df9e7ca459bf14b2f7b85a0e38a5454571
+      alias: mariadb
   variables:
     MYSQL_DATABASE: gitdatatest
     MYSQL_ROOT_PASSWORD: root
@@ -36,7 +33,8 @@ postgres:
   stage: test
   image: python:3.9
   services:
-    - postgres:latest
+    - name: postgres:18.6@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+      alias: postgres
   variables:
     POSTGRES_PASSWORD: password
     GITDATA_TEST_POSTGRES_DATABASE_HOST: postgres
@@ -61,39 +59,5 @@ oracle:
     - pip install '.[oracle]'
     - pip install -r tests/requirements.txt
   script:
-    - |
-      python - <<'PY'
-      import os
-      import time
-
-      import oracledb
-
-      deadline = time.time() + 300
-      while True:
-          try:
-              connection = oracledb.connect(
-                  host=os.environ['GITDATA_TEST_ORACLE_HOST'],
-                  port=int(os.environ['GITDATA_TEST_ORACLE_PORT']),
-                  service_name=os.environ['GITDATA_TEST_ORACLE_SERVICE_NAME'],
-                  user='SYSTEM',
-                  password=os.environ['ORACLE_PWD'],
-              )
-              break
-          except oracledb.Error:
-              if time.time() >= deadline:
-                  raise
-              time.sleep(5)
-
-      with connection:
-          with connection.cursor() as cursor:
-              cursor.execute(
-                  'CREATE USER GITDATA_TEST IDENTIFIED BY GitDataApp123'
-              )
-              cursor.execute(
-                  'GRANT CREATE SESSION, CREATE TABLE TO GITDATA_TEST'
-              )
-              cursor.execute(
-                  'GRANT UNLIMITED TABLESPACE TO GITDATA_TEST'
-              )
-      PY
+    - python tests/integration/setup_oracle.py
     - nosetests -c .noserc tests/integration/test_database_oracle.py
