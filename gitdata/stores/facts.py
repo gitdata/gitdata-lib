@@ -68,7 +68,7 @@ class Sqlite3FactStore(AbstractStore):
                     value = value.read()
                 value_type = get_type_str(value)
                 if value_type in valid_types:
-                    records.append((entity, attribute, value_type, value))
+                    records.append((entity, attribute, value_type, fixval(value)))
                 else:
                     msg = 'unsupported type <type %s> in value %r'
                     raise Exception(msg % (value_type, value))

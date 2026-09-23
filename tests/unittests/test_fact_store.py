@@ -320,6 +320,26 @@ class Sqlite3FileFactStoreTests(EntityStoreSuite, unittest.TestCase):
         self.store.connection.close()
         self.tempdir.cleanup()
 
+    def test_add_bytes_round_trips(self):
+        content = b'test123'
+
+        self.store.add([('1', 'value', content)])
+
+        self.assertEqual(
+            list(self.store.matching(('1', 'value', None))),
+            [('1', 'value', content)],
+        )
+
+    def test_add_stream_round_trips_as_bytes(self):
+        content = b'test123'
+
+        self.store.add([('1', 'value', io.BytesIO(content))])
+
+        self.assertEqual(
+            list(self.store.matching(('1', 'value', None))),
+            [('1', 'value', content)],
+        )
+
     def test_store_stream_returns_bytes(self):
         content = b'test123'
         new_id = self.store.put(dict(value=io.BytesIO(content)))
