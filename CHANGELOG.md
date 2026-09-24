@@ -7,6 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ## [v0.0.16] - 2026-09-19
+- add optional Oracle Database support with `python-oracledb` Thin mode and live CI integration tests
 - add initial encryption module and unit tests
 - refactor secrets module into a backend-agnostic core with pluggable storage
 - add `GITDATA_ENCRYPTION_KEY` and docker `/run/secrets` key resolution for secrets
