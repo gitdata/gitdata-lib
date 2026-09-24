@@ -6,29 +6,28 @@ from decimal import Decimal
 import unittest
 
 from gitdata.graphs import Graph
+from gitdata.utils import test_uid_maker
 
 
 def scan(g):
-
+    result = []
     for table in g.find('name', isa='table'):
-
-        print('Table:', table['name'])
-
         columns = [r['column'] for r in g.query(
             [
                 (table['columns'], 'includes', '?column')
             ]
         )]
-
         rows = [r['row'] for r in g.query(
             [
-                (table['rows'], 'includes', '?row')
+                (table['rows'], '.includes', '?row')
             ]
         )]
-        print(rows)
-
-        for n, column in enumerate(columns):
-            print(n, column)
+        result.append({
+            'name': table['name'],
+            'columns': columns,
+            'rows': rows,
+        })
+    return result
 
 
 class TestScan(unittest.TestCase):
@@ -52,8 +51,10 @@ class TestScan(unittest.TestCase):
             ]
         }
 
-        g = Graph()
+        g = Graph(new_uid=test_uid_maker())
         g.add(data)
-        # print(g)
-
-        print(scan(g))
+        self.assertEqual(scan(g), [{
+            'name': 'mytable',
+            'columns': ['name', 'address', 'age', 'salary'],
+            'rows': ['4', '5', '6', '7'],
+        }])

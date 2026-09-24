@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- distinguish node relationships from literal values with structural predicates
+- preserve repeated predicate values when reading graph nodes
+- escape colliding source predicates and omit factless values without dangling relationships
+- verify multiple source graphs retain independent roots in memory and SQLite repositories
+- require re-ingestion of older graph facts whose unprefixed relationships cannot be distinguished from literal IDs
 
 ## [v0.0.16] - 2026-09-19
 - add optional Oracle Database support with `python-oracledb` Thin mode and live CI integration tests

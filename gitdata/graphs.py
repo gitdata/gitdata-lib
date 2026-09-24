@@ -8,7 +8,7 @@ from decimal import Decimal
 from datetime import datetime, date
 
 import gitdata
-from gitdata.digester import digested, undigested
+from gitdata.digester import digested, predicate_name, undigested
 from gitdata.stores.facts import facts_of
 
 def retype(value, value_type):
@@ -189,7 +189,15 @@ class Graph:
 
         result = []
         for uid in sorted(uids):
-            values = {k: v for _, k, v in self.facts.matching((uid, None, None))}
+            values = {}
+            for _, stored_predicate, value in self.facts.matching((uid, None, None)):
+                predicate = predicate_name(stored_predicate)
+                if predicate not in values:
+                    values[predicate] = value
+                elif isinstance(values[predicate], list):
+                    values[predicate].append(value)
+                else:
+                    values[predicate] = [values[predicate], value]
             if values:
                 result.append(dict(**values))
 
