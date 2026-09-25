@@ -65,6 +65,22 @@ class GraphTests(unittest.TestCase):
         self.assertEqual(person['wage'], Decimal('12.1'))
         self.assertEqual(person['name'], 'Pat')
 
+    def test_get_preserves_repeated_predicate_values(self):
+        self.graph.facts.add([
+            ('1', '.friend', '2'),
+            ('1', '.friend', '3'),
+        ])
+
+        self.assertEqual(self.graph.get('1'), {'friend': ['2', '3']})
+
+    def test_get_preserves_literal_and_relationship_values(self):
+        self.graph.facts.add([
+            ('1', 'includes', '2'),
+            ('1', '.includes', '2'),
+        ])
+
+        self.assertEqual(self.graph.get('1'), {'includes': ['2', '2']})
+
     def test_stream_attribute(self):
         g = self.graph
         g.add([
