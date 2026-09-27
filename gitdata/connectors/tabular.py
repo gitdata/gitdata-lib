@@ -78,11 +78,19 @@ class SQLiteConnector(BaseConnector):
     def _table(self, pathname, name):
         quoted = self._quoted(name)
         with self._connect(pathname) as database:
-            columns = tuple(
-                row[1] for row in database.execute(
-                    'pragma table_info({})'.format(quoted)
+            try:
+                schema = database.execute(
+                    'pragma table_xinfo({})'.format(quoted)
                 )
-            )
+                columns = tuple(
+                    row[1] for row in schema if row[6] != 1
+                )
+            except sqlite3.OperationalError:
+                columns = tuple(
+                    row[1] for row in database.execute(
+                        'pragma table_info({})'.format(quoted)
+                    )
+                )
             if not columns:
                 raise ValueError('Table {!r} not found'.format(name))
 

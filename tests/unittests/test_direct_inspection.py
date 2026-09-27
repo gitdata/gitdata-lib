@@ -160,6 +160,26 @@ class DirectInspectionTests(unittest.TestCase):
             ],
         })
 
+    def test_sqlite_generated_columns_match_select_star_schema(self):
+        pathname = os.path.join(self.tempdir.name, 'generated.sqlite')
+        with sqlite3.connect(pathname) as database:
+            database.execute(
+                'create table measurements ('
+                'value integer, '
+                'doubled integer generated always as (value * 2) stored'
+                ')'
+            )
+            database.execute('insert into measurements (value) values (3)')
+
+        root = fetch(pathname + '#measurements')
+        self.assertEqual(root['columns'], ('value', 'doubled'))
+
+        report = scan(root)[0]
+        self.assertEqual(
+            [column['observed'] for column in report['columns']],
+            [(3,), (6,)],
+        )
+
     def test_sqlite_scan_does_not_modify_wal_source_files(self):
         source = os.path.join(self.tempdir.name, 'source.sqlite')
         copy = os.path.join(self.tempdir.name, 'copy.sqlite')
