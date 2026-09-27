@@ -98,6 +98,10 @@ def explore(node, destination):
 #                 yield a, b
 
 
+class UnsupportedRef(ValueError):
+    """Raised when no Connector can resolve a ref."""
+
+
 class Blob(io.BytesIO):
     """Blob"""
 
@@ -173,17 +177,16 @@ def add_connection_metadata(facts):
 
 
 def fetch(ref):
-    """Fetch data
-
-    Fetch the facts in a datasource and store them.
-    """
-    connectors = get_connectors()
-    for connector in connectors:
-        if hasattr(connector, 'get'):
-            facts = connector().get(ref)
-            if facts:
-                add_connection_metadata(facts)
-                return facts
+    """Resolve one ref through the Connector chain into one Python root."""
+    for connector_type in get_connectors():
+        connector = connector_type()
+        resolve = getattr(connector, 'fetch', None)
+        if resolve is None:
+            continue
+        result = resolve(ref)
+        if result is not None:
+            return result
+    raise UnsupportedRef('No Connector accepts {!r}'.format(ref))
 
 def get(ref):
     """Get Data

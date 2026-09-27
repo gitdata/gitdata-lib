@@ -4,6 +4,26 @@ Data Wrangling for Everyone.
 GitData is a fast, scalable, distributed data exploration system
 with a rich set of commands that provide ways to gather, manage and query data in an unusually straightforward way.
 
+## Direct inspection
+
+`ls` and `scan` inspect live Connector output directly. They do not initialize a
+repository, digest the data into facts, or write to a store.
+
+```bash
+# List CSV columns and profile up to 100,000 rows.
+gitdata ls customers.csv
+gitdata scan customers.csv
+
+# List SQLite tables, inspect one table, and profile a bounded sample.
+gitdata ls example.sqlite
+gitdata ls 'example.sqlite#customers'
+gitdata scan --limit 1000 'example.sqlite#customers'
+```
+
+CSV rows and SQLite query results are traversed lazily. A sampled report marks
+cardinality as approximate and reports the number of rows examined as a lower
+bound. A complete traversal reports the exact row count.
+
 ## Running the complete test suite locally
 
 Docker is the only host dependency for the complete Python 3.9 test matrix:
