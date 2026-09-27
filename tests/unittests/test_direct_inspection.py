@@ -8,12 +8,18 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pymysql
 
 from gitdata.cli import main
 from gitdata.connectors import fetch
 from gitdata.connectors.common import BaseConnector, get_connectors
-from gitdata.connectors.tabular import CsvConnector, SQLiteConnector
+from gitdata.connectors.tabular import (
+    CsvConnector,
+    MariaDBConnector,
+    SQLiteConnector,
+)
 from gitdata.inspection import list_items, scan
 
 
@@ -40,9 +46,38 @@ class DirectInspectionTests(unittest.TestCase):
         connector_types = set(get_connectors())
 
         self.assertTrue(issubclass(CsvConnector, BaseConnector))
+        self.assertTrue(issubclass(MariaDBConnector, BaseConnector))
         self.assertTrue(issubclass(SQLiteConnector, BaseConnector))
         self.assertIn(CsvConnector, connector_types)
+        self.assertIn(MariaDBConnector, connector_types)
         self.assertIn(SQLiteConnector, connector_types)
+
+    def test_mariadb_rows_use_an_unbuffered_cursor(self):
+        self.assertIs(
+            MariaDBConnector.row_cursor_class,
+            pymysql.cursors.SSCursor,
+        )
+
+    def test_mariadb_connection_closes_if_read_only_setup_fails(self):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.execute.side_effect = RuntimeError('read-only setup failed')
+
+        with patch(
+                'gitdata.connectors.tabular.pymysql.connect',
+                return_value=connection):
+            with self.assertRaisesRegex(RuntimeError, 'read-only setup failed'):
+                MariaDBConnector._connect({})
+
+        connection.close.assert_called_once_with()
+
+    def test_mariadb_inline_passwords_are_rejected_without_echoing_them(self):
+        ref = 'mysql://root:not-for-logs@127.0.0.1/gitdata_example'
+
+        with self.assertRaisesRegex(ValueError, 'password_env') as raised:
+            MariaDBConnector()._parts(ref)
+
+        self.assertNotIn('not-for-logs', str(raised.exception))
 
     def test_csv_ref_is_listed_and_scanned_without_a_store(self):
         pathname = self.write_csv(
@@ -243,6 +278,56 @@ class DirectInspectionTests(unittest.TestCase):
         self.assertIn('Column\tData Types\tCardinality\tSize\tObserved Values', output)
         self.assertIn('id\tstring\t~2\t1\t1, 2', output)
         self.assertIn('name\tstring\t~2\t5\tAda, Grace', output)
+
+
+@unittest.skipUnless(
+    os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_HOST'),
+    'MariaDB inspection service is not configured',
+)
+class MySQLDirectInspectionTests(unittest.TestCase):
+    def setUp(self):
+        password_name = 'GITDATA_TEST_MYSQL_INSPECTION_PASSWORD'
+        self.password = os.environ[password_name]
+        self.ref = 'mysql://{}@{}:{}/{}?password_env={}'.format(
+            os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_USER', 'root'),
+            os.environ['GITDATA_TEST_MYSQL_INSPECTION_HOST'],
+            os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_PORT', '3306'),
+            os.environ.get(
+                'GITDATA_TEST_MYSQL_INSPECTION_DATABASE',
+                'gitdata_example',
+            ),
+            password_name,
+        )
+
+    def test_mariadb_ref_lists_and_scans_dumped_example(self):
+        root = fetch(self.ref)
+
+        self.assertEqual(list_items(root), [
+            {'name': 'customers', 'type': 'table'},
+            {'name': 'orders', 'type': 'table'},
+            {'name': 'products', 'type': 'table'},
+        ])
+        self.assertEqual(set(root), {
+            'type', 'name', 'table_names', 'tables',
+        })
+
+        table = fetch(self.ref + '#customers')
+        self.assertEqual(table['columns'], (
+            'customer_id',
+            'name',
+            'email',
+            'country_code',
+            'joined_on',
+        ))
+
+        report = scan(table, limit=2)[0]
+        self.assertEqual(report['rows_scanned'], 2)
+        self.assertTrue(report['sampled'])
+        self.assertEqual(report['columns'][0]['observed'], (1, 2))
+        self.assertEqual(
+            report['columns'][1]['observed'],
+            ('Ada Lovelace', 'Grace Hopper'),
+        )
 
 
 if __name__ == '__main__':

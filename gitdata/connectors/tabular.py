@@ -4,6 +4,9 @@ import csv
 import os
 from pathlib import Path
 import sqlite3
+from urllib.parse import parse_qs, unquote, urlsplit
+
+import pymysql
 
 from gitdata.connectors.common import BaseConnector
 
@@ -43,6 +46,155 @@ class CsvConnector(BaseConnector):
             'name': os.path.basename(ref),
             'columns': columns,
             'rows': rows(),
+        }
+
+
+class MariaDBConnector(BaseConnector):
+    """Resolve a MariaDB/MySQL URL into a database or table root."""
+
+    schemes = ('mariadb', 'mysql')
+    row_cursor_class = pymysql.cursors.SSCursor
+
+    @staticmethod
+    def _quoted(name):
+        return '`{}`'.format(name.replace('`', '``'))
+
+    def accepts(self, ref):
+        return (
+            isinstance(ref, str)
+            and urlsplit(ref).scheme.lower() in self.schemes
+        )
+
+    def _parts(self, ref):
+        parts = urlsplit(ref)
+        query = parse_qs(parts.query, keep_blank_values=True)
+        unexpected = set(query) - {'password_env'}
+        if unexpected:
+            raise ValueError(
+                'Unsupported MariaDB ref option(s): {}'.format(
+                    ', '.join(sorted(unexpected))
+                )
+            )
+
+        database = unquote(parts.path.lstrip('/'))
+        if not parts.hostname or not database or '/' in database:
+            raise ValueError(
+                'MariaDB refs require a host and one database name'
+            )
+
+        if parts.password is not None:
+            raise ValueError(
+                'Inline MariaDB passwords are not supported; use password_env'
+            )
+        if query.get('password_env'):
+            variable = query['password_env'][-1]
+            try:
+                password = os.environ[variable]
+            except KeyError:
+                raise ValueError(
+                    'MariaDB password environment variable {!r} is not set'
+                    .format(variable)
+                )
+        else:
+            password = None
+
+        config = {
+            'host': parts.hostname,
+            'port': parts.port or 3306,
+            'user': unquote(parts.username or ''),
+            'password': password,
+            'database': database,
+            'charset': 'utf8mb4',
+            'autocommit': True,
+        }
+        table = unquote(parts.fragment) if parts.fragment else None
+        return config, table
+
+    @staticmethod
+    def _connect(config):
+        database = pymysql.connect(**config)
+        try:
+            with database.cursor() as cursor:
+                cursor.execute('set session transaction read only')
+        except Exception:
+            database.close()
+            raise
+        return database
+
+    def _table(self, config, name):
+        database = self._connect(config)
+        try:
+            with database.cursor() as cursor:
+                cursor.execute(
+                    'select column_name from information_schema.columns '
+                    'where table_schema=%s and table_name=%s '
+                    'order by ordinal_position',
+                    (config['database'], name),
+                )
+                columns = tuple(row[0] for row in cursor)
+        finally:
+            database.close()
+
+        if not columns:
+            raise ValueError('Table {!r} not found'.format(name))
+
+        quoted = self._quoted(name)
+
+        def rows():
+            connection = self._connect(config)
+            cursor = connection.cursor(self.row_cursor_class)
+            try:
+                cursor.execute('select * from {}'.format(quoted))
+                for row in cursor:
+                    yield row
+            finally:
+                # SSCursor.close() drains unread rows. Detach the unbuffered
+                # result before closing its socket so a bounded scan neither
+                # fetches the remainder nor triggers destructor-time reads.
+                result = getattr(cursor, '_result', None)
+                setattr(cursor, 'connection', None)
+                if result is not None:
+                    result.unbuffered_active = False
+                    result.connection = None
+                setattr(connection, '_result', None)
+                connection.close()
+
+        return {
+            'type': 'table',
+            'name': name,
+            'columns': columns,
+            'rows': rows(),
+        }
+
+    def fetch(self, ref):
+        if not self.accepts(ref):
+            return None
+        config, selected_table = self._parts(ref)
+        if selected_table:
+            return self._table(config, selected_table)
+
+        database = self._connect(config)
+        try:
+            with database.cursor() as cursor:
+                cursor.execute(
+                    'select table_name from information_schema.tables '
+                    "where table_schema=%s and table_type='BASE TABLE' "
+                    'order by table_name',
+                    (config['database'],),
+                )
+                names = tuple(row[0] for row in cursor)
+        finally:
+            database.close()
+
+        def tables():
+            for name in names:
+                yield self._table(config, name)
+
+        return {
+            'type': 'database',
+            'name': config['database'],
+            'table_names': names,
+            'tables': tables(),
         }
 
 
