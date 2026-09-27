@@ -4,6 +4,27 @@ Data Wrangling for Everyone.
 GitData is a fast, scalable, distributed data exploration system
 with a rich set of commands that provide ways to gather, manage and query data in an unusually straightforward way.
 
+## Development installation
+
+Install the checkout into a Python 3.9 virtual environment so the `gitdata`
+command works without setting `PYTHONPATH`:
+
+```bash
+python3.9 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+gitdata --help
+```
+
+The editable installation continues to use code from the checkout, so source
+changes do not require reinstalling it. Activate `.venv` in each new shell.
+Alternatively, if `pipx` is installed, put the editable command on your normal
+`PATH` without activating a project environment:
+
+```bash
+pipx install --python python3.9 --editable .
+```
+
 ## Direct inspection
 
 `ls` and `scan` inspect live Connector output directly. They do not initialize a
@@ -61,6 +82,17 @@ gitdata ls "$MARIADB_REF"         # tables in gitdata_example
 gitdata ls "${MARIADB_REF}#customers"
 gitdata scan --limit 2 "${MARIADB_REF}#customers"
 ```
+
+If the username is omitted, the connector uses the current operating-system
+username. If `password_env` is omitted, it attempts a passwordless connection.
+For example:
+
+```bash
+gitdata ls 'mysql://zeno'
+```
+
+Inline passwords remain unsupported; use `password_env` when a password is
+required.
 
 Remove the disposable database when finished:
 

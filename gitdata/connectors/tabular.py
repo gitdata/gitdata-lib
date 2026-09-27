@@ -1,6 +1,7 @@
 """Connectors that expose tabular refs as rooted Python structures."""
 
 import csv
+import getpass
 import os
 from pathlib import Path
 import sqlite3
@@ -105,7 +106,11 @@ class MariaDBConnector(BaseConnector):
         config = {
             'host': parts.hostname,
             'port': parts.port or 3306,
-            'user': unquote(parts.username or ''),
+            'user': (
+                unquote(parts.username)
+                if parts.username is not None
+                else getpass.getuser()
+            ),
             'password': password,
             'charset': 'utf8mb4',
             'autocommit': True,

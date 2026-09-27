@@ -96,6 +96,28 @@ class DirectInspectionTests(unittest.TestCase):
         cursor.execute.assert_any_call('show databases')
         connection.close.assert_called_once_with()
 
+    def test_mysql_server_ref_defaults_to_current_os_user_without_password(self):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([])
+
+        with patch(
+                'gitdata.connectors.tabular.pymysql.connect',
+                return_value=connection) as connect:
+            with patch(
+                    'getpass.getuser',
+                    return_value='lab-user'):
+                self.run_cli('ls', 'mysql://zeno')
+
+        connect.assert_called_once_with(
+            host='zeno',
+            port=3306,
+            user='lab-user',
+            password=None,
+            charset='utf8mb4',
+            autocommit=True,
+        )
+
     def test_mariadb_inline_passwords_are_rejected_without_echoing_them(self):
         password = '-'.join(('not', 'for', 'logs'))
         ref = 'mysql://root:{}@127.0.0.1/gitdata_example'.format(password)
