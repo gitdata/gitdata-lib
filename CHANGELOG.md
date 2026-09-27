@@ -6,6 +6,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 - add direct `gitdata ls` and streaming `gitdata scan` for CSV, SQLite, and MariaDB refs without digestion or storage
+- allow `gitdata ls` on a MariaDB server ref to list databases visible to the user
 - add reusable CSV, SQLite, and `mysqldump` examples for manual inspection
 - distinguish node relationships from literal values with structural predicates
 - preserve repeated predicate values when reading graph nodes

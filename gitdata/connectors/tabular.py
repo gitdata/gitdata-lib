@@ -77,9 +77,13 @@ class MariaDBConnector(BaseConnector):
             )
 
         database = unquote(parts.path.lstrip('/'))
-        if not parts.hostname or not database or '/' in database:
+        if not parts.hostname or '/' in database:
             raise ValueError(
-                'MariaDB refs require a host and one database name'
+                'MariaDB refs require a host and at most one database name'
+            )
+        if not database and parts.fragment:
+            raise ValueError(
+                'MariaDB table refs require a database name'
             )
 
         if parts.password is not None:
@@ -103,10 +107,11 @@ class MariaDBConnector(BaseConnector):
             'port': parts.port or 3306,
             'user': unquote(parts.username or ''),
             'password': password,
-            'database': database,
             'charset': 'utf8mb4',
             'autocommit': True,
         }
+        if database:
+            config['database'] = database
         table = unquote(parts.fragment) if parts.fragment else None
         return config, table
 
@@ -170,6 +175,19 @@ class MariaDBConnector(BaseConnector):
         if not self.accepts(ref):
             return None
         config, selected_table = self._parts(ref)
+        if 'database' not in config:
+            connection = self._connect(config)
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('show databases')
+                    names = tuple(row[0] for row in cursor)
+            finally:
+                connection.close()
+            return {
+                'type': 'server',
+                'name': config['host'],
+                'database_names': names,
+            }
         if selected_table:
             return self._table(config, selected_table)
 

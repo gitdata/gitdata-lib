@@ -19,6 +19,11 @@ TYPE_NAMES = {
 
 def list_items(root):
     """Describe the immediate children of a supported root."""
+    if root.get('type') == 'server':
+        return [
+            {'name': name, 'type': 'database'}
+            for name in root['database_names']
+        ]
     if root.get('type') == 'table':
         return [
             {'name': name, 'type': 'column'}

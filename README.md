@@ -53,9 +53,11 @@ Keep the password out of the ref by naming an environment variable:
 
 ```bash
 export GITDATA_EXAMPLE_MARIADB_PASSWORD=example
+MARIADB_SERVER_REF='mysql://root@127.0.0.1:3307?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
 MARIADB_REF='mysql://root@127.0.0.1:3307/gitdata_example?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
 
-gitdata ls "$MARIADB_REF"
+gitdata ls "$MARIADB_SERVER_REF"  # databases visible to root
+gitdata ls "$MARIADB_REF"         # tables in gitdata_example
 gitdata ls "${MARIADB_REF}#customers"
 gitdata scan --limit 2 "${MARIADB_REF}#customers"
 ```

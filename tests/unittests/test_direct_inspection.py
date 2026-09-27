@@ -71,13 +71,39 @@ class DirectInspectionTests(unittest.TestCase):
 
         connection.close.assert_called_once_with()
 
+    def test_mysql_server_ref_lists_visible_databases(self):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([
+            ('gitdata_example',),
+            ('information_schema',),
+        ])
+
+        with patch(
+                'gitdata.connectors.tabular.pymysql.connect',
+                return_value=connection) as connect:
+            output = self.run_cli('ls', 'mysql://root@127.0.0.1')
+
+        self.assertEqual(output, 'gitdata_example\ninformation_schema\n')
+        connect.assert_called_once_with(
+            host='127.0.0.1',
+            port=3306,
+            user='root',
+            password=None,
+            charset='utf8mb4',
+            autocommit=True,
+        )
+        cursor.execute.assert_any_call('show databases')
+        connection.close.assert_called_once_with()
+
     def test_mariadb_inline_passwords_are_rejected_without_echoing_them(self):
-        ref = 'mysql://root:not-for-logs@127.0.0.1/gitdata_example'
+        password = '-'.join(('not', 'for', 'logs'))
+        ref = 'mysql://root:{}@127.0.0.1/gitdata_example'.format(password)
 
         with self.assertRaisesRegex(ValueError, 'password_env') as raised:
             MariaDBConnector()._parts(ref)
 
-        self.assertNotIn('not-for-logs', str(raised.exception))
+        self.assertNotIn(password, str(raised.exception))
 
     def test_csv_ref_is_listed_and_scanned_without_a_store(self):
         pathname = self.write_csv(
@@ -288,15 +314,33 @@ class MySQLDirectInspectionTests(unittest.TestCase):
     def setUp(self):
         password_name = 'GITDATA_TEST_MYSQL_INSPECTION_PASSWORD'
         self.password = os.environ[password_name]
-        self.ref = 'mysql://{}@{}:{}/{}?password_env={}'.format(
-            os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_USER', 'root'),
-            os.environ['GITDATA_TEST_MYSQL_INSPECTION_HOST'],
-            os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_PORT', '3306'),
-            os.environ.get(
-                'GITDATA_TEST_MYSQL_INSPECTION_DATABASE',
-                'gitdata_example',
-            ),
+        user = os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_USER', 'root')
+        host = os.environ['GITDATA_TEST_MYSQL_INSPECTION_HOST']
+        port = os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_PORT', '3306')
+        database = os.environ.get(
+            'GITDATA_TEST_MYSQL_INSPECTION_DATABASE',
+            'gitdata_example',
+        )
+        self.server_ref = 'mysql://{}@{}:{}?password_env={}'.format(
+            user,
+            host,
+            port,
             password_name,
+        )
+        self.ref = 'mysql://{}@{}:{}/{}?password_env={}'.format(
+            user,
+            host,
+            port,
+            database,
+            password_name,
+        )
+
+    def test_mariadb_server_ref_lists_visible_databases(self):
+        items = list_items(fetch(self.server_ref))
+
+        self.assertIn(
+            {'name': 'gitdata_example', 'type': 'database'},
+            items,
         )
 
     def test_mariadb_ref_lists_and_scans_dumped_example(self):
