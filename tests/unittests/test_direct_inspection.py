@@ -317,7 +317,7 @@ class MySQLDirectInspectionTests(unittest.TestCase):
         user = os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_USER', 'root')
         host = os.environ['GITDATA_TEST_MYSQL_INSPECTION_HOST']
         port = os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_PORT', '3306')
-        database = os.environ.get(
+        self.database = os.environ.get(
             'GITDATA_TEST_MYSQL_INSPECTION_DATABASE',
             'gitdata_example',
         )
@@ -331,7 +331,7 @@ class MySQLDirectInspectionTests(unittest.TestCase):
             user,
             host,
             port,
-            database,
+            self.database,
             password_name,
         )
 
@@ -339,7 +339,7 @@ class MySQLDirectInspectionTests(unittest.TestCase):
         items = list_items(fetch(self.server_ref))
 
         self.assertIn(
-            {'name': 'gitdata_example', 'type': 'database'},
+            {'name': self.database, 'type': 'database'},
             items,
         )
 
