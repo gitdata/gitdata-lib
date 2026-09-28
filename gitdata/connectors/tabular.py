@@ -56,6 +56,12 @@ class MariaDBConnector(BaseConnector):
 
     schemes = ('mariadb', 'mysql')
     row_cursor_class = pymysql.cursors.SSCursor
+    system_databases = (
+        'information_schema',
+        'mysql',
+        'performance_schema',
+        'sys',
+    )
 
     @staticmethod
     def _quoted(name):
@@ -269,15 +275,19 @@ class MariaDBConnector(BaseConnector):
             try:
                 with connection.cursor() as cursor:
                     cursor.execute('show databases')
-                    names = tuple(row[0] for row in cursor)
+                    all_names = tuple(row[0] for row in cursor)
             finally:
                 connection.close()
+            names = tuple(
+                name for name in all_names
+                if name.lower() not in self.system_databases
+            )
 
-            def database_summaries():
+            def database_summaries(include_system=False):
                 stats_connection = self._connect(config)
                 try:
                     with stats_connection.cursor() as cursor:
-                        cursor.execute(
+                        query = (
                             'select s.schema_name, count(t.table_name), '
                             'coalesce(sum(t.table_rows), 0), '
                             'round(coalesce(sum('
@@ -286,8 +296,19 @@ class MariaDBConnector(BaseConnector):
                             'left join information_schema.tables t '
                             'on t.table_schema = s.schema_name '
                             "and t.table_type='BASE TABLE' "
-                            'group by s.schema_name order by s.schema_name'
                         )
+                        if include_system:
+                            cursor.execute(
+                                query +
+                                'group by s.schema_name order by s.schema_name'
+                            )
+                        else:
+                            cursor.execute(
+                                query +
+                                'where s.schema_name not in (%s, %s, %s, %s) '
+                                'group by s.schema_name order by s.schema_name',
+                                self.system_databases,
+                            )
                         for row in cursor:
                             yield {
                                 'name': row[0],
@@ -303,7 +324,9 @@ class MariaDBConnector(BaseConnector):
                 'type': 'server',
                 'name': config['host'],
                 'database_names': names,
+                'all_database_names': all_names,
                 'database_summaries': database_summaries(),
+                'all_database_summaries': database_summaries(True),
             }
         if selected_table:
             return self._table(config, selected_table, count_rows)
@@ -541,23 +564,26 @@ class SQLiteConnector(BaseConnector):
             )
 
         with closing(self._connect(pathname)) as database:
-            names = tuple(
+            all_names = tuple(
                 row[0] for row in database.execute(
                     "select name from sqlite_master "
-                    "where type='table' and name not like 'sqlite_%' "
-                    "order by name"
+                    "where type='table' order by name"
                 )
             )
+        names = tuple(
+            name for name in all_names
+            if not name.lower().startswith('sqlite_')
+        )
 
-        def tables():
-            for name in names:
+        def selected_tables(selected_names):
+            for name in selected_names:
                 yield self._table(
                     pathname, name, count_rows=count_rows
                 )
 
-        def table_summaries():
+        def table_summaries(selected_names):
             with closing(self._connect(pathname)) as database:
-                for name in names:
+                for name in selected_names:
                     quoted = self._quoted(name)
                     columns = sum(
                         1 for row in self._schema(database, quoted)
@@ -595,6 +621,9 @@ class SQLiteConnector(BaseConnector):
             'type': 'database',
             'name': os.path.basename(pathname),
             'table_names': names,
-            'tables': tables(),
-            'table_summaries': table_summaries(),
+            'all_table_names': all_names,
+            'tables': selected_tables(names),
+            'all_tables': selected_tables(all_names),
+            'table_summaries': table_summaries(names),
+            'all_table_summaries': table_summaries(all_names),
         }

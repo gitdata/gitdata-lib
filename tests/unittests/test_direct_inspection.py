@@ -196,7 +196,7 @@ class DirectInspectionTests(unittest.TestCase):
                 return_value=connection) as connect:
             output = self.run_cli('ls', 'mysql://root@127.0.0.1')
 
-        self.assertEqual(output, 'gitdata_example\ninformation_schema\n')
+        self.assertEqual(output, 'gitdata_example\n')
         connect.assert_called_once_with(
             host='127.0.0.1',
             port=3306,
@@ -207,6 +207,21 @@ class DirectInspectionTests(unittest.TestCase):
         )
         cursor.execute.assert_any_call('show databases')
         connection.close.assert_called_once_with()
+
+    def test_mysql_server_all_lists_system_databases(self):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([
+            ('gitdata_example',),
+            ('performance_schema',),
+        ])
+
+        with patch(
+                'gitdata.connectors.tabular.pymysql.connect',
+                return_value=connection):
+            output = self.run_cli('ls', '-a', 'mysql://root@127.0.0.1')
+
+        self.assertEqual(output, 'gitdata_example\nperformance_schema\n')
 
     def test_mysql_server_verbose_lists_database_stats(self):
         names_connection = MagicMock()
@@ -220,14 +235,35 @@ class DirectInspectionTests(unittest.TestCase):
                 MariaDBConnector,
                 '_connect',
                 side_effect=(names_connection, stats_connection)):
-            output = self.run_cli('ls', '-v', 'mysql://root@localhost')
+            output = self.run_cli('ls', '-l', 'mysql://root@localhost')
 
         self.assertIn('Database', output)
         self.assertRegex(output, r'cocal\s+3\s+42\s+7')
         stats_cursor.execute.assert_called_once()
         stats_sql = stats_cursor.execute.call_args[0][0].lower()
         self.assertIn("t.table_type='base table'", stats_sql)
+        self.assertIn('s.schema_name not in', stats_sql)
         stats_connection.close.assert_called_once_with()
+
+    def test_mysql_server_long_all_includes_system_database_stats(self):
+        names_connection = MagicMock()
+        names_cursor = names_connection.cursor.return_value.__enter__.return_value
+        names_cursor.__iter__.return_value = iter([('performance_schema',)])
+        stats_connection = MagicMock()
+        stats_cursor = stats_connection.cursor.return_value.__enter__.return_value
+        stats_cursor.__iter__.return_value = iter([
+            ('performance_schema', 12, 0, 0),
+        ])
+
+        with patch.object(
+                MariaDBConnector,
+                '_connect',
+                side_effect=(names_connection, stats_connection)):
+            output = self.run_cli('ls', '-la', 'mysql://root@localhost')
+
+        self.assertRegex(output, r'performance_schema\s+12\s+0\s+0')
+        stats_sql = stats_cursor.execute.call_args[0][0].lower()
+        self.assertNotIn('s.schema_name not in', stats_sql)
 
     def test_mysql_server_ref_defaults_to_current_os_user_without_password(self):
         connection = MagicMock()
@@ -264,7 +300,7 @@ class DirectInspectionTests(unittest.TestCase):
                 '_connect',
                 side_effect=(names_connection, stats_connection)):
             output = self.run_cli(
-                'ls', '-v', 'mysql://root@localhost/cocal'
+                'ls', '-l', 'mysql://root@localhost/cocal'
             )
 
         self.assertIn('Table', output)
@@ -297,7 +333,7 @@ class DirectInspectionTests(unittest.TestCase):
                     index_connection,
                 )):
             output = self.run_cli(
-                'ls', '-v', 'mysql://root@localhost/cocal.customers'
+                'ls', '-l', 'mysql://root@localhost/cocal.customers'
             )
 
         self.assertRegex(output, r'id\s+int\s+NO\s+PRI\s+-\s+auto_increment')
@@ -329,7 +365,7 @@ class DirectInspectionTests(unittest.TestCase):
                     index_connection,
                 )):
             output = self.run_cli(
-                'ls', '-v', 'mysql://root@localhost/cocal.customers'
+                'ls', '-l', 'mysql://root@localhost/cocal.customers'
             )
 
         self.assertRegex(output, r'name_lower\s+NO\s+lower\(`name`\)')
@@ -560,7 +596,7 @@ class DirectInspectionTests(unittest.TestCase):
         root = fetch(pathname + '/measurements')
         self.assertEqual(root['columns'], ('value', 'doubled'))
 
-        output = self.run_cli('ls', '-v', pathname + '/measurements')
+        output = self.run_cli('ls', '-l', pathname + '/measurements')
         self.assertIn('doubled', output)
 
         report = scan(root)[0]
@@ -654,6 +690,20 @@ class DirectInspectionTests(unittest.TestCase):
 
         self.assertEqual(output, 'id\nname\n')
 
+    def test_ls_all_includes_sqlite_system_tables(self):
+        pathname = os.path.join(self.tempdir.name, 'system.sqlite')
+        with sqlite3.connect(pathname) as database:
+            database.execute(
+                'create table items (id integer primary key autoincrement)'
+            )
+            database.execute('insert into items default values')
+
+        ordinary = self.run_cli('ls', pathname)
+        all_items = self.run_cli('ls', '-a', pathname)
+
+        self.assertEqual(ordinary, 'items\n')
+        self.assertEqual(all_items, 'items\nsqlite_sequence\n')
+
     def test_ls_verbose_describes_sqlite_tables(self):
         pathname = os.path.join(self.tempdir.name, 'verbose.sqlite')
         with sqlite3.connect(pathname) as database:
@@ -665,7 +715,7 @@ class DirectInspectionTests(unittest.TestCase):
                 ((1, 'Ada'), (2, 'Grace')),
             )
 
-        output = self.run_cli('ls', '-v', pathname)
+        output = self.run_cli('ls', '-l', pathname)
 
         self.assertIn('Table', output)
         self.assertIn('Columns', output)
@@ -684,7 +734,7 @@ class DirectInspectionTests(unittest.TestCase):
                 'create unique index customers_name on customers (name)'
             )
 
-        output = self.run_cli('ls', '-v', pathname + '/customers')
+        output = self.run_cli('ls', '-l', pathname + '/customers')
 
         self.assertIn('Column', output)
         self.assertRegex(output, r'id\s+INTEGER\s+YES\s+PRI')
@@ -699,7 +749,7 @@ class DirectInspectionTests(unittest.TestCase):
             database.execute('create index ix_pair on t (a, b)')
             database.execute('create index ix_expr on t (lower(a))')
 
-        output = self.run_cli('ls', '-v', pathname + '/t')
+        output = self.run_cli('ls', '-l', pathname + '/t')
 
         self.assertRegex(output, r'ix_pair\s+NO\s+a, b')
         self.assertRegex(output, r'ix_expr\s+NO\s+.*lower\(a\)')
@@ -735,7 +785,7 @@ class DirectInspectionTests(unittest.TestCase):
         with patch(
                 'gitdata.cli.gitdata_ls.fetch',
                 return_value=root) as resolve:
-            self.run_cli('ls', '-v', 'example.sqlite/items')
+            self.run_cli('ls', '-l', 'example.sqlite/items')
 
         resolve.assert_called_once_with(
             'example.sqlite/items', count_rows=False
@@ -746,15 +796,15 @@ class DirectInspectionTests(unittest.TestCase):
         with patch(
                 'gitdata.cli.gitdata_ls.fetch',
                 return_value=root):
-            output = self.run_cli('ls', '-v', 'example.sqlite/items.value')
+            output = self.run_cli('ls', '-l', 'example.sqlite/items.value')
 
         self.assertEqual(output, '')
 
-    def test_scan_announces_itself_before_fetching_data(self):
+    def test_scan_announces_itself_after_fetching_data(self):
         error = StringIO()
 
-        def fetch_after_announcement(*args, **kwargs):
-            self.assertEqual(error.getvalue(), 'Scanning...\n')
+        def fetch_before_announcement(*args, **kwargs):
+            self.assertEqual(error.getvalue(), '')
             return {
                 'type': 'table',
                 'name': 'slow',
@@ -765,10 +815,24 @@ class DirectInspectionTests(unittest.TestCase):
         with patch.object(sys, 'argv', ['gitdata', 'scan', 'slow.csv']):
             with patch(
                     'gitdata.cli.gitdata_scan.fetch',
-                    side_effect=fetch_after_announcement):
+                    side_effect=fetch_before_announcement):
                 with redirect_stderr(error):
                     with redirect_stdout(StringIO()):
                         main()
+
+        self.assertEqual(error.getvalue(), 'Scanning...\n')
+
+    def test_scan_does_not_announce_an_invalid_ref(self):
+        error = StringIO()
+        with patch.object(sys, 'argv', ['gitdata', 'scan', 'not-a-ref']):
+            with patch(
+                    'gitdata.cli.gitdata_scan.fetch',
+                    side_effect=ValueError('invalid ref')):
+                with redirect_stderr(error):
+                    with self.assertRaisesRegex(ValueError, 'invalid ref'):
+                        main()
+
+        self.assertEqual(error.getvalue(), '')
 
     def test_scan_title_uses_singular_column_and_row_labels(self):
         pathname = self.write_csv('one.csv', 'value\nonly\n')
@@ -783,13 +847,20 @@ class DirectInspectionTests(unittest.TestCase):
             'name': 'localhost',
             'database_names': ('cocal',),
         }
+        error = StringIO()
         with patch(
                 'gitdata.cli.gitdata_scan.fetch',
                 return_value=root):
             with patch('gitdata.cli.gitdata_scan.scan') as profile:
-                with self.assertRaises(SystemExit) as raised:
-                    self.run_cli('scan', 'mysql://localhost')
+                with patch.object(
+                        sys,
+                        'argv',
+                        ['gitdata', 'scan', 'mysql://localhost']):
+                    with redirect_stderr(error):
+                        with self.assertRaises(SystemExit) as raised:
+                            main()
 
+        self.assertEqual(error.getvalue(), '')
         self.assertEqual(
             str(raised.exception),
             'gitdata scan: please supply a database name, for example '

@@ -2,7 +2,8 @@
 usage: gitdata ls [options] <ref>
 
 options:
-    --verbose, -v   show detailed information
+    --long, -l      use a long listing format
+    --all, -a       include database-specific system objects
     -h, --help      show help
 """
 
@@ -70,9 +71,10 @@ def _print_verbose(root, items):
 
 def ls_to_console(args):
     """List immediate children directly from Connector output."""
-    verbose = args['--verbose']
+    verbose = args['--long']
+    show_all = args['--all']
     root = fetch(args['<ref>'], count_rows=False)
-    items = list_items(root, verbose=verbose)
+    items = list_items(root, verbose=verbose, show_all=show_all)
     if verbose:
         if root['type'] == 'column':
             return

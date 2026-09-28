@@ -15,8 +15,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - default omitted MariaDB usernames to the current OS user and attempt passwordless authentication when no password environment variable is specified
 - add reusable CSV, SQLite, and `mysqldump` examples for manual inspection
 - exit cleanly without a traceback when a command is interrupted with Ctrl+C
-- announce `gitdata scan` before connecting, counting, or sampling
-- add `gitdata ls -v` database/table statistics, column schema, and index details
+- announce `gitdata scan` after ref validation and connection, immediately before sampling
+- add `gitdata ls -l` database/table statistics, column schema, and index details
+- hide database-specific system objects from `gitdata ls` unless `-a` is supplied
 - distinguish node relationships from literal values with structural predicates
 - preserve repeated predicate values when reading graph nodes
 - escape colliding source predicates and omit factless values without dangling relationships

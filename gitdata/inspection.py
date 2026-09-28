@@ -17,14 +17,20 @@ TYPE_NAMES = {
 }
 
 
-def list_items(root, verbose=False):
+def list_items(root, verbose=False, show_all=False):
     """Describe the immediate children of a supported root."""
     if root.get('type') == 'server':
+        if verbose and show_all and 'all_database_summaries' in root:
+            return list(root['all_database_summaries'])
         if verbose and 'database_summaries' in root:
             return list(root['database_summaries'])
+        names = (
+            root.get('all_database_names', root['database_names'])
+            if show_all else root['database_names']
+        )
         return [
             {'name': name, 'type': 'database'}
-            for name in root['database_names']
+            for name in names
         ]
     if root.get('type') == 'column':
         return []
@@ -36,9 +42,15 @@ def list_items(root, verbose=False):
             for name in root['columns']
         ]
     if root.get('type') == 'database':
+        if verbose and show_all and 'all_table_summaries' in root:
+            return list(root['all_table_summaries'])
         if verbose and 'table_summaries' in root:
             return list(root['table_summaries'])
         if verbose:
+            tables = (
+                root.get('all_tables', root['tables'])
+                if show_all else root['tables']
+            )
             return [
                 {
                     'name': table['name'],
@@ -47,11 +59,15 @@ def list_items(root, verbose=False):
                     'rows': table.get('row_count'),
                     'size': table.get('size', '-'),
                 }
-                for table in root['tables']
+                for table in tables
             ]
+        names = (
+            root.get('all_table_names', root['table_names'])
+            if show_all else root['table_names']
+        )
         return [
             {'name': name, 'type': 'table'}
-            for name in root['table_names']
+            for name in names
         ]
     raise ValueError('Cannot list root type {!r}'.format(root.get('type')))
 

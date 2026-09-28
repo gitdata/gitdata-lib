@@ -135,7 +135,6 @@ def scan_to_console(args):
     limit = int(args['--limit'])
     first = True
     for ref in args['<ref>']:
-        print('Scanning...', file=sys.stderr, flush=True)
         root = fetch(ref, count_rows=not args['--no-count'])
         if root.get('type') == 'server':
             raise SystemExit(
@@ -143,6 +142,7 @@ def scan_to_console(args):
                 'mysql://host/database; use gitdata ls on the server ref to '
                 'list visible databases'
             )
+        print('Scanning...', file=sys.stderr, flush=True)
         for report in scan(root, limit=limit):
             if not first:
                 print()
