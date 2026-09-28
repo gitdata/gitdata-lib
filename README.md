@@ -1,97 +1,126 @@
-# GitData Lib
-Data Wrangling for Everyone.
+# GitData
 
-GitData is a fast, scalable, distributed data exploration system
-with a rich set of commands that provide ways to gather, manage and query data in an unusually straightforward way.
+GitData gives you one set of commands for exploring files and databases.
+List what is inside a source with `gitdata ls`, then preview its data with
+`gitdata scan`.
 
-## Development installation
+## Install
 
-Install the checkout with Python 3.9 through 3.12 so the `gitdata` command
-works without setting `PYTHONPATH`. The default `python3` command is shown:
+GitData supports Python 3.9 through 3.12.
 
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-python -m pip install -e .
-gitdata --help
+python3 -m pip install gitdata-lib
 ```
 
-The editable installation continues to use code from the checkout, so source
-changes do not require reinstalling it. Activate `.venv` in each new shell.
-Alternatively, if `pipx` is installed, put the editable command on your normal
-`PATH` without activating a project environment:
+Oracle support is optional:
 
 ```bash
-pipx install --python python3 --editable .
+python3 -m pip install 'gitdata-lib[oracle]'
 ```
 
-## Direct inspection
+## Explore a data source
 
-`ls` and `scan` inspect live Connector output directly. They do not initialize a
-repository, digest the data into facts, or write to a store.
-
-The repository includes ready-to-use examples. Run these commands from the
-repository root:
+The same two commands work across CSV files, SQLite databases, and
+MariaDB/MySQL databases:
 
 ```bash
-# List tables, list one table's columns, scan the table, and scan one column.
-gitdata ls examples/inspection.sqlite
-# Add -l for table row/column counts and estimated sizes.
-gitdata ls -l examples/inspection.sqlite
-gitdata ls examples/inspection.sqlite/customers
-# On a table, -l shows schema details and indexes.
-gitdata ls -l examples/inspection.sqlite/customers
-gitdata scan --limit 2 examples/inspection.sqlite/customers
-gitdata scan --limit 2 examples/inspection.sqlite/customers.email
+gitdata ls <source>
+gitdata scan <source>
+```
 
-# A headered CSV can be inspected in the same way.
+Use `-l` for a detailed listing, `-a` to include system objects, and `--limit`
+to choose how many rows to preview.
+
+## CSV
+
+List the columns in a CSV file:
+
+```bash
 gitdata ls examples/locations-headered.csv
+```
+
+Preview its rows:
+
+```bash
 gitdata scan --limit 10 examples/locations-headered.csv
 ```
 
-Database scans issue `COUNT(*)` before sampling so the report normally includes
-an exact table row count. Use `--no-count` to skip that query when counting would
-be expensive; if the sample does not exhaust the rows, the report then shows a
-lower bound. Row sampling remains lazy and never reads beyond `--limit`. Once a
-ref has been validated and connected, the command writes `Scanning...` to standard
-error before sampling begins. Invalid and server-only refs are rejected without
-first claiming that a scan has started. Pressing Ctrl+C stops any command cleanly
-without a Python traceback.
+## SQLite
 
-`gitdata ls -l` follows the detailed listings from `datascan`: server refs show
-database table/row/size statistics, database refs show table column/row/size
-statistics, and table refs show column schema and index details. Plain `ls`
-continues to print names only. Database-specific system objects are hidden by
-default: MariaDB/MySQL omits `information_schema`, `mysql`,
-`performance_schema`, and `sys`, while SQLite omits `sqlite_*` tables. Add
-`-a`/`--all` to include them; `-la` combines system objects with the long
-listing. SQLite sizes are estimated from up to 100 rows; MariaDB/MySQL uses
-`information_schema` statistics.
+Start with the database file, then move into a table or column:
 
-SQLite refs form a hierarchy beneath the database filename:
+```bash
+# List tables
+gitdata ls examples/inspection.sqlite
 
-```text
-path/to/database.sqlite                 database
-path/to/database.sqlite/table           table
-path/to/database.sqlite/table.column    column
+# Show table details
+gitdata ls -l examples/inspection.sqlite/customers
+
+# Preview rows
+gitdata scan --limit 5 examples/inspection.sqlite/customers
+
+# Examine one column
+gitdata scan --limit 5 examples/inspection.sqlite/customers.email
 ```
 
-`ls` lists immediate children: tables below a database and columns below a table.
-A column is a leaf, so `ls` on a column produces no entries. `scan` on a column
-profiles only that column while still counting rows in its table by default.
-Literal dots in table or column identifiers must be percent-encoded as `%2E`.
+SQLite references follow this shape:
 
-### MariaDB example
+```text
+path/to/database.sqlite
+path/to/database.sqlite/table
+path/to/database.sqlite/table.column
+```
 
-`examples/mariadb.sql` is a `mysqldump` of a `gitdata_example` database with
-`customers`, `orders`, and `products` tables. Load it into a disposable MariaDB
-container:
+## MariaDB and MySQL
+
+Keep passwords in environment variables instead of putting them in database
+references:
+
+```bash
+export GITDATA_DB_PASSWORD='your-password'
+
+SERVER='mysql://user@db.example.com?password_env=GITDATA_DB_PASSWORD'
+DATABASE='mysql://user@db.example.com/sales?password_env=GITDATA_DB_PASSWORD'
+TABLE='mysql://user@db.example.com/sales.orders?password_env=GITDATA_DB_PASSWORD'
+```
+
+Explore the server, database, and table with the same commands:
+
+```bash
+# List databases
+gitdata ls "$SERVER"
+
+# List tables
+gitdata ls "$DATABASE"
+
+# Show columns and indexes
+gitdata ls -l "$TABLE"
+
+# Preview rows
+gitdata scan --limit 10 "$TABLE"
+```
+
+MariaDB/MySQL references follow this shape:
+
+```text
+mysql://user@host
+mysql://user@host/database
+mysql://user@host/database.table
+```
+
+If the username is omitted, GitData uses the current operating-system username.
+Use `gitdata ls -a` when you also want to see system databases or tables.
+
+### Try the included MariaDB example
+
+The repository includes `examples/mariadb.sql`. Load it into a disposable
+MariaDB container:
 
 ```bash
 docker run --name gitdata-example-mariadb \
   -e MARIADB_ROOT_PASSWORD=example \
   -p 3307:3306 \
-  -d mariadb:10.7@sha256:9a48ac9f196f3d4fd6fea2cab59a49df9e7ca459bf14b2f7b85a0e38a5454571
+  -d mariadb:10.7
 
 until docker exec gitdata-example-mariadb \
   mariadb-admin ping -h 127.0.0.1 -uroot -pexample --silent
@@ -101,89 +130,38 @@ done
 
 docker exec -i gitdata-example-mariadb \
   mariadb -uroot -pexample < examples/mariadb.sql
+
+export GITDATA_EXAMPLE_PASSWORD=example
+gitdata ls 'mysql://root@127.0.0.1:3307/gitdata_example?password_env=GITDATA_EXAMPLE_PASSWORD'
+gitdata scan --limit 5 'mysql://root@127.0.0.1:3307/gitdata_example.customers?password_env=GITDATA_EXAMPLE_PASSWORD'
 ```
 
-Keep the password out of the ref by naming an environment variable:
-
-```bash
-export GITDATA_EXAMPLE_MARIADB_PASSWORD=example
-MARIADB_SERVER_REF='mysql://root@127.0.0.1:3307?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
-MARIADB_REF='mysql://root@127.0.0.1:3307/gitdata_example?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
-MARIADB_TABLE_REF='mysql://root@127.0.0.1:3307/gitdata_example.customers?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
-
-gitdata ls "$MARIADB_SERVER_REF"     # databases visible to root
-gitdata ls -l "$MARIADB_SERVER_REF"  # database statistics
-gitdata ls "$MARIADB_REF"            # tables in gitdata_example
-gitdata ls -l "$MARIADB_REF"         # table statistics
-gitdata ls -l "$MARIADB_TABLE_REF"   # column schema and indexes
-gitdata scan --limit 2 "$MARIADB_TABLE_REF"
-```
-
-If the username is omitted, the connector uses the current operating-system
-username. If `password_env` is omitted, it attempts a passwordless connection.
-For example:
-
-```bash
-gitdata ls 'mysql://zeno'
-```
-
-Inline passwords remain unsupported; use `password_env` when a password is
-required.
-
-MariaDB/MySQL refs follow the SQL qualification users already expect:
-
-```text
-mysql://host                         server
-mysql://host/database                database
-mysql://host/database.table          table
-```
-
-The earlier `database#table` form used a URI fragment as a generic nested-resource
-selector. It remains accepted for MariaDB/MySQL compatibility, but
-`database.table` is canonical. A literal dot inside an identifier must be
-percent-encoded as `%2E`. SQLite does not use fragments; its `/table.column`
-hierarchy follows the database filename.
-
-Remove the disposable database when finished:
+Remove the example when finished:
 
 ```bash
 docker rm -f gitdata-example-mariadb
 ```
 
-## Running the complete test suite locally
+## Command reference
 
-Docker is the only host dependency for the complete database-backed Python 3.12
-suite:
-
-```bash
-bash tests/run_with_docker.sh
+```text
+gitdata ls <source>          list databases, tables, or columns
+gitdata ls -l <source>       show a detailed listing
+gitdata ls -a <source>       include system objects
+gitdata scan <source>        preview and profile data
+gitdata scan --limit N ...   preview at most N rows
 ```
 
-CI additionally runs the general and SQLite suites on Python 3.9, 3.10, 3.11,
-and 3.12, and runs the MariaDB, PostgreSQL, and Oracle integration jobs on
-both Python 3.9 and 3.12.
-
-The runner builds a disposable test image, runs the general and SQLite suites,
-and then starts MariaDB, PostgreSQL, and Oracle Free Lite one at a time. Each
-database container and network is removed before the next service starts and is
-also cleaned up if a test fails.
-
-The service images are pinned by digest. They can be replaced without editing
-the script by setting `GITDATA_TEST_MARIADB_IMAGE`,
-`GITDATA_TEST_POSTGRES_IMAGE`, or `GITDATA_TEST_ORACLE_IMAGE`.
-
-## Oracle Database
-
-Oracle support uses the Python DB-API driver `python-oracledb`, which defaults
-to Thin mode. The adapter does not initialize Thick mode, so Oracle Instant
-Client is not required. The driver is optional and is loaded only when an
-Oracle connection is requested:
+Run a command with `--help` for all options:
 
 ```bash
-pip install 'gitdata-lib[oracle]'
+gitdata ls --help
+gitdata scan --help
 ```
 
-Connect with an Oracle service name:
+## Oracle from Python
+
+Use the optional Oracle driver through the Python API:
 
 ```python
 import os
@@ -201,19 +179,3 @@ db = connect(
 
 rows = list(db('SELECT 1 FROM dual'))
 ```
-
-A complete `dsn` can be supplied instead of `host`, `port`, and
-`service_name`. Installing `gitdata-lib` without the `oracle` extra does not
-install or import `python-oracledb`; requesting an Oracle connection in that
-case reports the extra that must be installed.
-
-The Oracle integration tests use these environment variables:
-
-- `GITDATA_TEST_ORACLE_USER`
-- `GITDATA_TEST_ORACLE_PASSWORD`
-- `GITDATA_TEST_ORACLE_SERVICE_NAME`
-- `GITDATA_TEST_ORACLE_HOST` (defaults to `127.0.0.1`)
-- `GITDATA_TEST_ORACLE_PORT` (defaults to `1521`)
-
-They have been exercised against Oracle Free using the
-`container-registry.oracle.com/database/free:latest` container image.
