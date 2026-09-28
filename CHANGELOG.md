@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.0.18] - 2026-09-28
 - support and test Python 3.9 through 3.12
 - replace removed `collections` aliases with `collections.abc`
 - update PostgreSQL and CLI dependencies for Python 3.12
