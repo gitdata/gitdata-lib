@@ -10,6 +10,7 @@ The most commonly used gitdata commands are:
     init        initialize a local gitdata repository
     fetch       fetch data to the local reposotiry
     get         get data
+    ls          list immediate children of a ref
     scan        scan data
     secret      manage repository secrets
 
@@ -46,7 +47,16 @@ def get_module_doc(name):
 
 
 def main():
-    """CLI main"""
+    """CLI entry point with clean interrupt handling."""
+    try:
+        _main()
+    except KeyboardInterrupt:
+        print('\nInterrupted.', file=sys.stderr)
+        raise SystemExit(130)
+
+
+def _main():
+    """Parse and dispatch a CLI command."""
 
     if len(sys.argv) == 1:
         print_help(__doc__)
@@ -83,6 +93,11 @@ def main():
         from gitdata.cli.gitdata_get import get, __doc__ as doc
         args = docopt(doc, argv=argv)
         get(args)
+
+    elif command == 'ls':
+        from gitdata.cli.gitdata_ls import ls_to_console, __doc__ as doc
+        args = docopt(doc, argv=argv)
+        ls_to_console(args)
 
     elif command == 'scan':
         from gitdata.cli.gitdata_scan import scan_to_console, __doc__ as doc

@@ -172,14 +172,23 @@ start_service mariadb "$MARIADB_IMAGE" \
     -e MARIADB_DATABASE=gitdatatest \
     -e MARIADB_ROOT_PASSWORD=root
 wait_for_mariadb
+"$DOCKER" exec -i "$active_container" \
+    mariadb -uroot -proot < "$ROOT/examples/mariadb.sql"
 "$DOCKER" run --rm \
     --network "$active_network" \
     -e GITDATA_TEST_MYSQL_DATABASE_HOST=mariadb \
     -e GITDATA_TEST_MYSQL_DATABASE_USER=root \
     -e GITDATA_TEST_MYSQL_DATABASE_PASSWORD=root \
+    -e GITDATA_TEST_MYSQL_INSPECTION_HOST=mariadb \
+    -e GITDATA_TEST_MYSQL_INSPECTION_PORT=3306 \
+    -e GITDATA_TEST_MYSQL_INSPECTION_USER=root \
+    -e GITDATA_TEST_MYSQL_INSPECTION_PASSWORD=root \
+    -e GITDATA_TEST_MYSQL_INSPECTION_DATABASE=gitdata_example \
     "$TEST_IMAGE" \
-    python -m nose -c .noserc \
-    tests/unittests/test_database.py:TestMySQLDatabase
+    sh -c '
+        python -m nose -c .noserc tests/unittests/test_database.py:TestMySQLDatabase &&
+        python -m nose -c .noserc tests/unittests/test_direct_inspection.py:MySQLDirectInspectionTests
+    '
 cleanup_active
 
 phase 'Running PostgreSQL tests'
