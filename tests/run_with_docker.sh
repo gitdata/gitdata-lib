@@ -154,7 +154,7 @@ wait_for_oracle() {
     return 1
 }
 
-phase 'Building the Python 3.9 test image'
+phase 'Building the Python 3.12 test image'
 "$DOCKER" build -f "$ROOT/tests/Dockerfile" -t "$TEST_IMAGE" "$ROOT"
 if [[ "$remove_test_image" == true ]]; then
     owned_test_image=$TEST_IMAGE

@@ -6,11 +6,11 @@ with a rich set of commands that provide ways to gather, manage and query data i
 
 ## Development installation
 
-Install the checkout into a Python 3.9 through 3.12 virtual environment so the
-`gitdata` command works without setting `PYTHONPATH` (Python 3.12 is shown):
+Install the checkout with Python 3.9 through 3.12 so the `gitdata` command
+works without setting `PYTHONPATH`. The default `python3` command is shown:
 
 ```bash
-python3.12 -m venv .venv
+python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
 gitdata --help
@@ -22,7 +22,7 @@ Alternatively, if `pipx` is installed, put the editable command on your normal
 `PATH` without activating a project environment:
 
 ```bash
-pipx install --python python3.12 --editable .
+pipx install --python python3 --editable .
 ```
 
 ## Direct inspection
@@ -152,7 +152,7 @@ docker rm -f gitdata-example-mariadb
 
 ## Running the complete test suite locally
 
-Docker is the only host dependency for the complete database-backed Python 3.9
+Docker is the only host dependency for the complete database-backed Python 3.12
 suite:
 
 ```bash
