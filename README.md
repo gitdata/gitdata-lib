@@ -34,19 +34,34 @@ The repository includes ready-to-use examples. Run these commands from the
 repository root:
 
 ```bash
-# List tables in the SQLite example, list one table's columns, and scan it.
+# List tables, list one table's columns, scan the table, and scan one column.
 gitdata ls examples/inspection.sqlite
-gitdata ls 'examples/inspection.sqlite#customers'
-gitdata scan --limit 2 'examples/inspection.sqlite#customers'
+gitdata ls examples/inspection.sqlite/customers
+gitdata scan --limit 2 examples/inspection.sqlite/customers
+gitdata scan --limit 2 examples/inspection.sqlite/customers.email
 
 # A headered CSV can be inspected in the same way.
 gitdata ls examples/locations-headered.csv
 gitdata scan --limit 10 examples/locations-headered.csv
 ```
 
-CSV rows and database query results are traversed lazily. A sampled report marks
-cardinality as approximate and reports the number of rows examined as a lower
-bound. A complete traversal reports the exact row count.
+Database scans issue `COUNT(*)` before sampling so the report normally includes
+an exact table row count. Use `--no-count` to skip that query when counting would
+be expensive; if the sample does not exhaust the rows, the report then shows a
+lower bound. Row sampling remains lazy and never reads beyond `--limit`.
+
+SQLite refs form a hierarchy beneath the database filename:
+
+```text
+path/to/database.sqlite                 database
+path/to/database.sqlite/table           table
+path/to/database.sqlite/table.column    column
+```
+
+`ls` lists immediate children: tables below a database and columns below a table.
+A column is a leaf, so `ls` on a column produces no entries. `scan` on a column
+profiles only that column while still counting rows in its table by default.
+Literal dots in table or column identifiers must be percent-encoded as `%2E`.
 
 ### MariaDB example
 
@@ -104,10 +119,10 @@ mysql://host/database.table          table
 ```
 
 The earlier `database#table` form used a URI fragment as a generic nested-resource
-selector. It remains accepted for compatibility, but `database.table` is the
-canonical MariaDB/MySQL spelling. A literal dot inside an identifier must be
-percent-encoded as `%2E`. File-based refs such as SQLite continue to use
-`#table`, because dots are already part of their path and filename syntax.
+selector. It remains accepted for MariaDB/MySQL compatibility, but
+`database.table` is canonical. A literal dot inside an identifier must be
+percent-encoded as `%2E`. SQLite does not use fragments; its `/table.column`
+hierarchy follows the database filename.
 
 Remove the disposable database when finished:
 

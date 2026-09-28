@@ -3,6 +3,7 @@ usage: gitdata scan [options] <ref>...
 
 options:
     --limit=<n>, -n <n>     maximum rows sampled per table [default: 100000]
+    --no-count              skip the eager database COUNT(*) query
     -h, --help              show help
 """
 
@@ -21,8 +22,15 @@ def _title(report):
     else:
         rows = '{:,}'.format(report['row_count'])
     sampled = ' (sampled)' if report['sampled'] else ''
-    return '{}: {:,} columns, {} rows{}'.format(
-        report['name'], columns, rows, sampled
+    column_label = 'column' if columns == 1 else 'columns'
+    row_label_count = (
+        report['row_count']
+        if report['row_count'] is not None
+        else report['rows_scanned']
+    )
+    row_label = 'row' if row_label_count == 1 else 'rows'
+    return '{}: {:,} {}, {} {}{}'.format(
+        report['name'], columns, column_label, rows, row_label, sampled
     )
 
 
@@ -126,7 +134,9 @@ def scan_to_console(args):
     limit = int(args['--limit'])
     first = True
     for ref in args['<ref>']:
-        for report in scan(fetch(ref), limit=limit):
+        for report in scan(
+                fetch(ref, count_rows=not args['--no-count']),
+                limit=limit):
             if not first:
                 print()
             first = False

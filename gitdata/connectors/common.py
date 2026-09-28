@@ -176,14 +176,23 @@ def add_connection_metadata(facts):
     )
 
 
-def fetch(ref):
+def fetch(ref, count_rows=True):
     """Resolve one ref through the Connector chain into one Python root."""
     for connector_type in get_connectors():
         connector = connector_type()
         resolve = getattr(connector, 'fetch', None)
         if resolve is None:
             continue
-        result = resolve(ref)
+        parameters = inspect.signature(resolve).parameters.values()
+        supports_options = any(
+            parameter.name == 'count_rows'
+            or parameter.kind == inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters
+        )
+        if supports_options:
+            result = resolve(ref, count_rows=count_rows)
+        else:
+            result = resolve(ref)
         if result is not None:
             return result
     raise UnsupportedRef('No Connector accepts {!r}'.format(ref))

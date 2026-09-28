@@ -24,6 +24,8 @@ def list_items(root):
             {'name': name, 'type': 'database'}
             for name in root['database_names']
         ]
+    if root.get('type') == 'column':
+        return []
     if root.get('type') == 'table':
         return [
             {'name': name, 'type': 'column'}
@@ -48,6 +50,8 @@ def _value_key(value):
 def _profile_table(table, limit):
     if limit <= 0:
         raise ValueError('scan limit must be greater than zero')
+
+    known_count = table.get('row_count')
 
     columns = tuple(table['columns'])
     profiles = [
@@ -89,7 +93,6 @@ def _profile_table(table, limit):
         if close is not None:
             close()
 
-    known_count = table.get('row_count')
     if known_count is not None:
         sampled = rows_scanned < known_count
         row_count = known_count
@@ -118,10 +121,13 @@ def _profile_table(table, limit):
 
 def scan(root, limit=100000):
     """Profile tables directly from rooted Connector output."""
-    if root.get('type') == 'table':
+    if root.get('type') in ('table', 'column'):
         tables = (root,)
     elif root.get('type') == 'database':
         tables = root['tables']
     else:
         raise ValueError('Cannot scan root type {!r}'.format(root.get('type')))
-    return [_profile_table(table, limit) for table in tables]
+    return [
+        _profile_table(table, limit)
+        for table in tables
+    ]

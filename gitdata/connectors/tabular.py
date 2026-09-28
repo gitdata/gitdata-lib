@@ -1,6 +1,7 @@
 """Connectors that expose tabular refs as rooted Python structures."""
 
 import csv
+from contextlib import closing
 import getpass
 import os
 from pathlib import Path
@@ -22,7 +23,7 @@ class CsvConnector(BaseConnector):
             and ref.lower().endswith('.csv')
         )
 
-    def fetch(self, ref):
+    def fetch(self, ref, count_rows=True):
         if not self.accepts(ref):
             return None
 
@@ -154,7 +155,7 @@ class MariaDBConnector(BaseConnector):
             raise
         return database
 
-    def _table(self, config, name):
+    def _table(self, config, name, count_rows):
         database = self._connect(config)
         try:
             with database.cursor() as cursor:
@@ -172,6 +173,17 @@ class MariaDBConnector(BaseConnector):
             raise ValueError('Table {!r} not found'.format(name))
 
         quoted = self._quoted(name)
+
+        def eager_count():
+            connection = self._connect(config)
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('select count(*) from {}'.format(quoted))
+                    return cursor.fetchone()[0]
+            finally:
+                connection.close()
+
+        row_count = eager_count() if count_rows else None
 
         def rows():
             connection = self._connect(config)
@@ -196,10 +208,11 @@ class MariaDBConnector(BaseConnector):
             'type': 'table',
             'name': name,
             'columns': columns,
+            'row_count': row_count,
             'rows': rows(),
         }
 
-    def fetch(self, ref):
+    def fetch(self, ref, count_rows=True):
         if not self.accepts(ref):
             return None
         config, selected_table = self._parts(ref)
@@ -217,7 +230,7 @@ class MariaDBConnector(BaseConnector):
                 'database_names': names,
             }
         if selected_table:
-            return self._table(config, selected_table)
+            return self._table(config, selected_table, count_rows)
 
         database = self._connect(config)
         try:
@@ -234,7 +247,7 @@ class MariaDBConnector(BaseConnector):
 
         def tables():
             for name in names:
-                yield self._table(config, name)
+                yield self._table(config, name, count_rows)
 
         return {
             'type': 'database',
@@ -249,20 +262,42 @@ class SQLiteConnector(BaseConnector):
 
     suffixes = ('.db', '.sqlite', '.sqlite3')
 
-    def _parts(self, ref):
-        pathname, separator, table = ref.partition('#')
-        return pathname, table if separator else None
-
-    def accepts(self, ref):
-        if not isinstance(ref, str):
-            return False
-        pathname, _ = self._parts(ref)
+    def _is_sqlite_path(self, pathname):
         if not os.path.isfile(pathname):
             return False
         if pathname.lower().endswith(self.suffixes):
             return True
         with open(pathname, 'rb') as source:
             return source.read(16) == b'SQLite format 3\x00'
+
+    def _parts(self, ref):
+        if self._is_sqlite_path(ref):
+            return ref, None, None
+        pathname, separator, selector = ref.rpartition('/')
+        if not separator or not selector or not self._is_sqlite_path(pathname):
+            return ref, None, None
+        if selector.count('.') > 1:
+            raise ValueError(
+                'SQLite refs accept one table.column selection'
+            )
+        raw_table, dot, raw_column = selector.partition('.')
+        if not raw_table or (dot and not raw_column):
+            raise ValueError(
+                'SQLite refs require a table before an optional column'
+            )
+        return (
+            pathname,
+            unquote(raw_table),
+            unquote(raw_column) if dot else None,
+        )
+
+    def accepts(self, ref):
+        if not isinstance(ref, str):
+            return False
+        pathname, table, _ = self._parts(ref)
+        return self._is_sqlite_path(pathname) and (
+            table is not None or pathname == ref
+        )
 
     @staticmethod
     def _quoted(name):
@@ -273,46 +308,76 @@ class SQLiteConnector(BaseConnector):
         uri = Path(pathname).resolve().as_uri() + '?mode=ro'
         return sqlite3.connect(uri, uri=True)
 
-    def _table(self, pathname, name):
+    def _table(
+            self, pathname, name, selected_column=None, count_rows=True):
         quoted = self._quoted(name)
-        with self._connect(pathname) as database:
+        with closing(self._connect(pathname)) as database:
             try:
                 schema = database.execute(
                     'pragma table_xinfo({})'.format(quoted)
                 )
-                columns = tuple(
+                all_columns = tuple(
                     row[1] for row in schema if row[6] != 1
                 )
             except sqlite3.OperationalError:
-                columns = tuple(
+                all_columns = tuple(
                     row[1] for row in database.execute(
                         'pragma table_info({})'.format(quoted)
                     )
                 )
-            if not columns:
+            if not all_columns:
                 raise ValueError('Table {!r} not found'.format(name))
+            if selected_column is not None and selected_column not in all_columns:
+                raise ValueError(
+                    'Column {!r} not found in table {!r}'.format(
+                        selected_column, name
+                    )
+                )
+
+        if selected_column is None:
+            columns = all_columns
+            projection = '*'
+            root_type = 'table'
+            root_name = name
+        else:
+            columns = (selected_column,)
+            projection = self._quoted(selected_column)
+            root_type = 'column'
+            root_name = '{}.{}'.format(name, selected_column)
+
+        def eager_count():
+            with closing(self._connect(pathname)) as database:
+                return database.execute(
+                    'select count(*) from {}'.format(quoted)
+                ).fetchone()[0]
+
+        row_count = eager_count() if count_rows else None
 
         def rows():
-            with self._connect(pathname) as database:
+            with closing(self._connect(pathname)) as database:
                 database.row_factory = sqlite3.Row
-                for row in database.execute('select * from {}'.format(quoted)):
+                for row in database.execute(
+                        'select {} from {}'.format(projection, quoted)):
                     yield dict(row)
 
         return {
-            'type': 'table',
-            'name': name,
+            'type': root_type,
+            'name': root_name,
             'columns': columns,
+            'row_count': row_count,
             'rows': rows(),
         }
 
-    def fetch(self, ref):
+    def fetch(self, ref, count_rows=True):
         if not self.accepts(ref):
             return None
-        pathname, selected_table = self._parts(ref)
+        pathname, selected_table, selected_column = self._parts(ref)
         if selected_table:
-            return self._table(pathname, selected_table)
+            return self._table(
+                pathname, selected_table, selected_column, count_rows
+            )
 
-        with self._connect(pathname) as database:
+        with closing(self._connect(pathname)) as database:
             names = tuple(
                 row[0] for row in database.execute(
                     "select name from sqlite_master "
@@ -323,7 +388,9 @@ class SQLiteConnector(BaseConnector):
 
         def tables():
             for name in names:
-                yield self._table(pathname, name)
+                yield self._table(
+                    pathname, name, count_rows=count_rows
+                )
 
         return {
             'type': 'database',
