@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [v0.0.17] - 2026-09-28
 - add direct `gitdata ls` and streaming `gitdata scan` for CSV, SQLite, and MariaDB refs without digestion or storage
 - allow `gitdata ls` on a MariaDB server ref to list databases visible to the user
 - accept canonical `database.table` selection in MariaDB/MySQL refs while retaining `#table` compatibility
