@@ -497,6 +497,27 @@ class DirectInspectionTests(unittest.TestCase):
 
         self.assertIn('one.csv: 1 column, 1 row\n', output)
 
+    def test_scan_server_ref_requests_a_database_without_a_traceback(self):
+        root = {
+            'type': 'server',
+            'name': 'localhost',
+            'database_names': ('cocal',),
+        }
+        with patch(
+                'gitdata.cli.gitdata_scan.fetch',
+                return_value=root):
+            with patch('gitdata.cli.gitdata_scan.scan') as profile:
+                with self.assertRaises(SystemExit) as raised:
+                    self.run_cli('scan', 'mysql://localhost')
+
+        self.assertEqual(
+            str(raised.exception),
+            'gitdata scan: please supply a database name, for example '
+            'mysql://host/database; use gitdata ls on the server ref to list '
+            'visible databases',
+        )
+        profile.assert_not_called()
+
     def test_sampled_scan_title_uses_singular_lower_bound(self):
         pathname = os.path.join(self.tempdir.name, 'sampled.sqlite')
         with sqlite3.connect(pathname) as database:

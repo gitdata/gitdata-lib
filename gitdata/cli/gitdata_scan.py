@@ -134,9 +134,14 @@ def scan_to_console(args):
     limit = int(args['--limit'])
     first = True
     for ref in args['<ref>']:
-        for report in scan(
-                fetch(ref, count_rows=not args['--no-count']),
-                limit=limit):
+        root = fetch(ref, count_rows=not args['--no-count'])
+        if root.get('type') == 'server':
+            raise SystemExit(
+                'gitdata scan: please supply a database name, for example '
+                'mysql://host/database; use gitdata ls on the server ref to '
+                'list visible databases'
+            )
+        for report in scan(root, limit=limit):
             if not first:
                 print()
             first = False
