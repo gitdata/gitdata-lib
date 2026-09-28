@@ -6,7 +6,7 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from unittest.mock import MagicMock, patch
 
@@ -38,9 +38,53 @@ class DirectInspectionTests(unittest.TestCase):
     def run_cli(self, *arguments):
         output = StringIO()
         with patch.object(sys, 'argv', ['gitdata'] + list(arguments)):
-            with redirect_stdout(output):
-                main()
+            with redirect_stderr(StringIO()):
+                with redirect_stdout(output):
+                    main()
         return output.getvalue()
+
+    def test_ctrl_c_exits_cleanly_without_a_traceback(self):
+        error = StringIO()
+        with patch.object(sys, 'argv', ['gitdata', 'scan', 'slow.csv']):
+            with patch(
+                    'gitdata.cli.gitdata_scan.scan_to_console',
+                    side_effect=KeyboardInterrupt):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 130)
+        self.assertEqual(error.getvalue(), '\nInterrupted.\n')
+
+    def test_ctrl_c_during_a_scan_closes_rows_and_exits_cleanly(self):
+        closed = []
+
+        def rows():
+            try:
+                raise KeyboardInterrupt
+                yield
+            finally:
+                closed.append(True)
+
+        root = {
+            'type': 'table',
+            'name': 'slow',
+            'columns': ('value',),
+            'rows': rows(),
+        }
+        error = StringIO()
+        with patch.object(sys, 'argv', ['gitdata', 'scan', 'slow.csv']):
+            with patch(
+                    'gitdata.cli.gitdata_scan.fetch',
+                    return_value=root):
+                with redirect_stderr(error):
+                    with redirect_stdout(StringIO()):
+                        with self.assertRaises(SystemExit) as raised:
+                            main()
+
+        self.assertEqual(raised.exception.code, 130)
+        self.assertEqual(closed, [True])
+        self.assertEqual(error.getvalue(), 'Scanning...\n\nInterrupted.\n')
 
     def test_tabular_connectors_participate_in_connector_discovery(self):
         connector_types = set(get_connectors())
@@ -126,6 +170,19 @@ class DirectInspectionTests(unittest.TestCase):
 
         connection.close.assert_called_once_with()
 
+    def test_mariadb_connection_closes_if_read_only_setup_is_interrupted(self):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.execute.side_effect = KeyboardInterrupt
+
+        with patch(
+                'gitdata.connectors.tabular.pymysql.connect',
+                return_value=connection):
+            with self.assertRaises(KeyboardInterrupt):
+                MariaDBConnector._connect({})
+
+        connection.close.assert_called_once_with()
+
     def test_mysql_server_ref_lists_visible_databases(self):
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
@@ -151,6 +208,27 @@ class DirectInspectionTests(unittest.TestCase):
         cursor.execute.assert_any_call('show databases')
         connection.close.assert_called_once_with()
 
+    def test_mysql_server_verbose_lists_database_stats(self):
+        names_connection = MagicMock()
+        names_cursor = names_connection.cursor.return_value.__enter__.return_value
+        names_cursor.__iter__.return_value = iter([('cocal',)])
+        stats_connection = MagicMock()
+        stats_cursor = stats_connection.cursor.return_value.__enter__.return_value
+        stats_cursor.__iter__.return_value = iter([('cocal', 3, 42, 7)])
+
+        with patch.object(
+                MariaDBConnector,
+                '_connect',
+                side_effect=(names_connection, stats_connection)):
+            output = self.run_cli('ls', '-v', 'mysql://root@localhost')
+
+        self.assertIn('Database', output)
+        self.assertRegex(output, r'cocal\s+3\s+42\s+7')
+        stats_cursor.execute.assert_called_once()
+        stats_sql = stats_cursor.execute.call_args[0][0].lower()
+        self.assertIn("t.table_type='base table'", stats_sql)
+        stats_connection.close.assert_called_once_with()
+
     def test_mysql_server_ref_defaults_to_current_os_user_without_password(self):
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
@@ -172,6 +250,89 @@ class DirectInspectionTests(unittest.TestCase):
             charset='utf8mb4',
             autocommit=True,
         )
+
+    def test_mysql_database_verbose_lists_table_stats(self):
+        names_connection = MagicMock()
+        names_cursor = names_connection.cursor.return_value.__enter__.return_value
+        names_cursor.__iter__.return_value = iter([('customers',)])
+        stats_connection = MagicMock()
+        stats_cursor = stats_connection.cursor.return_value.__enter__.return_value
+        stats_cursor.__iter__.return_value = iter([('customers', 5, 23, 2)])
+
+        with patch.object(
+                MariaDBConnector,
+                '_connect',
+                side_effect=(names_connection, stats_connection)):
+            output = self.run_cli(
+                'ls', '-v', 'mysql://root@localhost/cocal'
+            )
+
+        self.assertIn('Table', output)
+        self.assertRegex(output, r'customers\s+5\s+23\s+2')
+        stats_cursor.execute.assert_called_once()
+        stats_connection.close.assert_called_once_with()
+
+    def test_mysql_table_verbose_lists_columns_and_indexes(self):
+        schema_connection = MagicMock()
+        schema_cursor = schema_connection.cursor.return_value.__enter__.return_value
+        schema_cursor.__iter__.return_value = iter([('id',), ('name',)])
+        detail_connection = MagicMock()
+        detail_cursor = detail_connection.cursor.return_value.__enter__.return_value
+        detail_cursor.__iter__.return_value = iter([
+            ('id', 'int', 'NO', 'PRI', None, 'auto_increment'),
+            ('name', 'varchar(80)', 'YES', '', None, ''),
+        ])
+        index_connection = MagicMock()
+        index_cursor = index_connection.cursor.return_value.__enter__.return_value
+        index_cursor.__iter__.return_value = iter([
+            ('customers', 0, 'PRIMARY', 1, 'id'),
+        ])
+
+        with patch.object(
+                MariaDBConnector,
+                '_connect',
+                side_effect=(
+                    schema_connection,
+                    detail_connection,
+                    index_connection,
+                )):
+            output = self.run_cli(
+                'ls', '-v', 'mysql://root@localhost/cocal.customers'
+            )
+
+        self.assertRegex(output, r'id\s+int\s+NO\s+PRI\s+-\s+auto_increment')
+        self.assertRegex(output, r'name\s+varchar\(80\)\s+YES')
+        self.assertRegex(output, r'PRIMARY\s+YES\s+id')
+
+    def test_mysql_table_verbose_handles_functional_indexes(self):
+        schema_connection = MagicMock()
+        schema_cursor = schema_connection.cursor.return_value.__enter__.return_value
+        schema_cursor.__iter__.return_value = iter([('name',)])
+        detail_connection = MagicMock()
+        detail_cursor = detail_connection.cursor.return_value.__enter__.return_value
+        detail_cursor.__iter__.return_value = iter([
+            ('name', 'varchar(80)', 'YES', '', None, ''),
+        ])
+        index_connection = MagicMock()
+        index_cursor = index_connection.cursor.return_value.__enter__.return_value
+        index_cursor.__iter__.return_value = iter([
+            ('customers', 1, 'name_lower', 1, None, None, 0, None,
+             None, 'YES', 'BTREE', '', '', 'YES', 'lower(`name`)'),
+        ])
+
+        with patch.object(
+                MariaDBConnector,
+                '_connect',
+                side_effect=(
+                    schema_connection,
+                    detail_connection,
+                    index_connection,
+                )):
+            output = self.run_cli(
+                'ls', '-v', 'mysql://root@localhost/cocal.customers'
+            )
+
+        self.assertRegex(output, r'name_lower\s+NO\s+lower\(`name`\)')
 
     def test_mysql_ref_accepts_database_dot_table_selection(self):
         config, table = MariaDBConnector()._parts(
@@ -399,11 +560,26 @@ class DirectInspectionTests(unittest.TestCase):
         root = fetch(pathname + '/measurements')
         self.assertEqual(root['columns'], ('value', 'doubled'))
 
+        output = self.run_cli('ls', '-v', pathname + '/measurements')
+        self.assertIn('doubled', output)
+
         report = scan(root)[0]
         self.assertEqual(
             [column['observed'] for column in report['columns']],
             [(3,), (6,)],
         )
+
+    def test_sqlite_schema_falls_back_when_table_xinfo_is_unavailable(self):
+        database = MagicMock()
+        database.execute.side_effect = (
+            iter(()),
+            iter(((0, 'value', 'INTEGER', 0, None, 0),)),
+        )
+
+        schema = SQLiteConnector._schema(database, '"items"')
+
+        self.assertEqual(schema, ((0, 'value', 'INTEGER', 0, None, 0, 0),))
+        self.assertEqual(database.execute.call_count, 2)
 
     def test_sqlite_scan_does_not_modify_wal_source_files(self):
         source = os.path.join(self.tempdir.name, 'source.sqlite')
@@ -478,6 +654,56 @@ class DirectInspectionTests(unittest.TestCase):
 
         self.assertEqual(output, 'id\nname\n')
 
+    def test_ls_verbose_describes_sqlite_tables(self):
+        pathname = os.path.join(self.tempdir.name, 'verbose.sqlite')
+        with sqlite3.connect(pathname) as database:
+            database.execute(
+                'create table customers (id integer, name text)'
+            )
+            database.executemany(
+                'insert into customers values (?, ?)',
+                ((1, 'Ada'), (2, 'Grace')),
+            )
+
+        output = self.run_cli('ls', '-v', pathname)
+
+        self.assertIn('Table', output)
+        self.assertIn('Columns', output)
+        self.assertIn('Rows', output)
+        self.assertIn('Size (MB)', output)
+        self.assertRegex(output, r'customers\s+2\s+2\s+0')
+
+    def test_ls_verbose_describes_sqlite_columns_and_indexes(self):
+        pathname = os.path.join(self.tempdir.name, 'schema.sqlite')
+        with sqlite3.connect(pathname) as database:
+            database.execute(
+                'create table customers ('
+                'id integer primary key, name text not null default "unknown")'
+            )
+            database.execute(
+                'create unique index customers_name on customers (name)'
+            )
+
+        output = self.run_cli('ls', '-v', pathname + '/customers')
+
+        self.assertIn('Column', output)
+        self.assertRegex(output, r'id\s+INTEGER\s+YES\s+PRI')
+        self.assertRegex(output, r'name\s+TEXT\s+NO\s+-\s+"unknown"')
+        self.assertIn('Index', output)
+        self.assertRegex(output, r'customers_name\s+YES\s+name')
+
+    def test_ls_verbose_describes_sqlite_expression_indexes(self):
+        pathname = os.path.join(self.tempdir.name, 'expression.sqlite')
+        with sqlite3.connect(pathname) as database:
+            database.execute('create table t (a text, b text)')
+            database.execute('create index ix_pair on t (a, b)')
+            database.execute('create index ix_expr on t (lower(a))')
+
+        output = self.run_cli('ls', '-v', pathname + '/t')
+
+        self.assertRegex(output, r'ix_pair\s+NO\s+a, b')
+        self.assertRegex(output, r'ix_expr\s+NO\s+.*lower\(a\)')
+
     def test_ls_does_not_request_database_row_counts(self):
         root = {'type': 'column', 'name': 'items.value'}
         with patch(
@@ -489,6 +715,60 @@ class DirectInspectionTests(unittest.TestCase):
         resolve.assert_called_once_with(
             'example.sqlite/items.value', count_rows=False
         )
+
+    def test_ls_verbose_does_not_eager_count_a_selected_table(self):
+        root = {
+            'type': 'table',
+            'name': 'items',
+            'columns': ('value',),
+            'column_summaries': iter(({
+                'name': 'value',
+                'type': 'column',
+                'data_type': 'INTEGER',
+                'null': 'YES',
+                'key': '-',
+                'default': '-',
+                'extra': '-',
+            },)),
+            'indexes': iter(()),
+        }
+        with patch(
+                'gitdata.cli.gitdata_ls.fetch',
+                return_value=root) as resolve:
+            self.run_cli('ls', '-v', 'example.sqlite/items')
+
+        resolve.assert_called_once_with(
+            'example.sqlite/items', count_rows=False
+        )
+
+    def test_ls_verbose_on_a_column_is_empty(self):
+        root = {'type': 'column', 'name': 'items.value'}
+        with patch(
+                'gitdata.cli.gitdata_ls.fetch',
+                return_value=root):
+            output = self.run_cli('ls', '-v', 'example.sqlite/items.value')
+
+        self.assertEqual(output, '')
+
+    def test_scan_announces_itself_before_fetching_data(self):
+        error = StringIO()
+
+        def fetch_after_announcement(*args, **kwargs):
+            self.assertEqual(error.getvalue(), 'Scanning...\n')
+            return {
+                'type': 'table',
+                'name': 'slow',
+                'columns': (),
+                'rows': iter(()),
+            }
+
+        with patch.object(sys, 'argv', ['gitdata', 'scan', 'slow.csv']):
+            with patch(
+                    'gitdata.cli.gitdata_scan.fetch',
+                    side_effect=fetch_after_announcement):
+                with redirect_stderr(error):
+                    with redirect_stdout(StringIO()):
+                        main()
 
     def test_scan_title_uses_singular_column_and_row_labels(self):
         pathname = self.write_csv('one.csv', 'value\nonly\n')
@@ -636,7 +916,7 @@ class MySQLDirectInspectionTests(unittest.TestCase):
             {'name': 'products', 'type': 'table'},
         ])
         self.assertEqual(set(root), {
-            'type', 'name', 'table_names', 'tables',
+            'type', 'name', 'table_names', 'tables', 'table_summaries',
         })
 
         table = fetch(self.table_ref)

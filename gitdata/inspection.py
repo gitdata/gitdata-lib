@@ -17,9 +17,11 @@ TYPE_NAMES = {
 }
 
 
-def list_items(root):
+def list_items(root, verbose=False):
     """Describe the immediate children of a supported root."""
     if root.get('type') == 'server':
+        if verbose and 'database_summaries' in root:
+            return list(root['database_summaries'])
         return [
             {'name': name, 'type': 'database'}
             for name in root['database_names']
@@ -27,11 +29,26 @@ def list_items(root):
     if root.get('type') == 'column':
         return []
     if root.get('type') == 'table':
+        if verbose and 'column_summaries' in root:
+            return list(root['column_summaries'])
         return [
             {'name': name, 'type': 'column'}
             for name in root['columns']
         ]
     if root.get('type') == 'database':
+        if verbose and 'table_summaries' in root:
+            return list(root['table_summaries'])
+        if verbose:
+            return [
+                {
+                    'name': table['name'],
+                    'type': 'table',
+                    'columns': len(table['columns']),
+                    'rows': table.get('row_count'),
+                    'size': table.get('size', '-'),
+                }
+                for table in root['tables']
+            ]
         return [
             {'name': name, 'type': 'table'}
             for name in root['table_names']

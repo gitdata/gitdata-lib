@@ -150,7 +150,7 @@ class MariaDBConnector(BaseConnector):
         try:
             with database.cursor() as cursor:
                 cursor.execute('set session transaction read only')
-        except Exception:
+        except BaseException:
             database.close()
             raise
         return database
@@ -204,12 +204,60 @@ class MariaDBConnector(BaseConnector):
                 setattr(connection, '_result', None)
                 connection.close()
 
+        def column_summaries():
+            connection = self._connect(config)
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute('describe {}'.format(quoted))
+                    for row in cursor:
+                        yield {
+                            'name': row[0],
+                            'type': 'column',
+                            'data_type': row[1],
+                            'null': row[2],
+                            'key': row[3] or '-',
+                            'default': row[4] if row[4] is not None else '-',
+                            'extra': row[5] or '-',
+                        }
+            finally:
+                connection.close()
+
+        def indexes():
+            connection = self._connect(config)
+            try:
+                by_name = {}
+                order = []
+                with connection.cursor() as cursor:
+                    cursor.execute('show index from {}'.format(quoted))
+                    for row in cursor:
+                        index_name = row[2]
+                        if index_name not in by_name:
+                            by_name[index_name] = {
+                                'name': index_name,
+                                'unique': 'YES' if row[1] == 0 else 'NO',
+                                'columns': [],
+                            }
+                            order.append(index_name)
+                        column = row[4]
+                        if column is None:
+                            column = row[14] if len(row) > 14 else None
+                            column = column or '<expression>'
+                        by_name[index_name]['columns'].append(column)
+                for index_name in order:
+                    item = by_name[index_name]
+                    item['columns'] = ', '.join(item['columns'])
+                    yield item
+            finally:
+                connection.close()
+
         return {
             'type': 'table',
             'name': name,
             'columns': columns,
             'row_count': row_count,
             'rows': rows(),
+            'column_summaries': column_summaries(),
+            'indexes': indexes(),
         }
 
     def fetch(self, ref, count_rows=True):
@@ -224,10 +272,38 @@ class MariaDBConnector(BaseConnector):
                     names = tuple(row[0] for row in cursor)
             finally:
                 connection.close()
+
+            def database_summaries():
+                stats_connection = self._connect(config)
+                try:
+                    with stats_connection.cursor() as cursor:
+                        cursor.execute(
+                            'select s.schema_name, count(t.table_name), '
+                            'coalesce(sum(t.table_rows), 0), '
+                            'round(coalesce(sum('
+                            't.data_length + t.index_length), 0) / 1024 / 1024) '
+                            'from information_schema.schemata s '
+                            'left join information_schema.tables t '
+                            'on t.table_schema = s.schema_name '
+                            "and t.table_type='BASE TABLE' "
+                            'group by s.schema_name order by s.schema_name'
+                        )
+                        for row in cursor:
+                            yield {
+                                'name': row[0],
+                                'type': 'database',
+                                'tables': int(row[1]),
+                                'rows': int(row[2]),
+                                'size': int(row[3]),
+                            }
+                finally:
+                    stats_connection.close()
+
             return {
                 'type': 'server',
                 'name': config['host'],
                 'database_names': names,
+                'database_summaries': database_summaries(),
             }
         if selected_table:
             return self._table(config, selected_table, count_rows)
@@ -249,11 +325,43 @@ class MariaDBConnector(BaseConnector):
             for name in names:
                 yield self._table(config, name, count_rows)
 
+        def table_summaries():
+            stats_connection = self._connect(config)
+            try:
+                with stats_connection.cursor() as cursor:
+                    cursor.execute(
+                        'select t.table_name, count(c.column_name), '
+                        'coalesce(t.table_rows, 0), '
+                        'round(coalesce('
+                        't.data_length + t.index_length, 0) / 1024 / 1024) '
+                        'from information_schema.tables t '
+                        'left join information_schema.columns c '
+                        'on c.table_schema = t.table_schema '
+                        'and c.table_name = t.table_name '
+                        'where t.table_schema=%s '
+                        "and t.table_type='BASE TABLE' "
+                        'group by t.table_name, t.table_rows, '
+                        't.data_length, t.index_length '
+                        'order by t.table_name',
+                        (config['database'],),
+                    )
+                    for row in cursor:
+                        yield {
+                            'name': row[0],
+                            'type': 'table',
+                            'columns': int(row[1]),
+                            'rows': int(row[2]),
+                            'size': int(row[3]),
+                        }
+            finally:
+                stats_connection.close()
+
         return {
             'type': 'database',
             'name': config['database'],
             'table_names': names,
             'tables': tables(),
+            'table_summaries': table_summaries(),
         }
 
 
@@ -308,23 +416,31 @@ class SQLiteConnector(BaseConnector):
         uri = Path(pathname).resolve().as_uri() + '?mode=ro'
         return sqlite3.connect(uri, uri=True)
 
+    @staticmethod
+    def _schema(database, quoted):
+        try:
+            schema = tuple(database.execute(
+                'pragma table_xinfo({})'.format(quoted)
+            ))
+            if schema:
+                return schema
+        except sqlite3.OperationalError:
+            pass
+        return tuple(
+            tuple(row) + (0,)
+            for row in database.execute(
+                'pragma table_info({})'.format(quoted)
+            )
+        )
+
     def _table(
             self, pathname, name, selected_column=None, count_rows=True):
         quoted = self._quoted(name)
         with closing(self._connect(pathname)) as database:
-            try:
-                schema = database.execute(
-                    'pragma table_xinfo({})'.format(quoted)
-                )
-                all_columns = tuple(
-                    row[1] for row in schema if row[6] != 1
-                )
-            except sqlite3.OperationalError:
-                all_columns = tuple(
-                    row[1] for row in database.execute(
-                        'pragma table_info({})'.format(quoted)
-                    )
-                )
+            all_columns = tuple(
+                row[1] for row in self._schema(database, quoted)
+                if row[6] != 1
+            )
             if not all_columns:
                 raise ValueError('Table {!r} not found'.format(name))
             if selected_column is not None and selected_column not in all_columns:
@@ -360,12 +476,59 @@ class SQLiteConnector(BaseConnector):
                         'select {} from {}'.format(projection, quoted)):
                     yield dict(row)
 
+        def column_summaries():
+            with closing(self._connect(pathname)) as database:
+                for row in self._schema(database, quoted):
+                    if row[6] == 1:
+                        continue
+                    if selected_column is not None and row[1] != selected_column:
+                        continue
+                    yield {
+                        'name': row[1],
+                        'type': 'column',
+                        'data_type': row[2] or '-',
+                        'null': 'NO' if row[3] else 'YES',
+                        'key': 'PRI' if row[5] else '-',
+                        'default': row[4] if row[4] is not None else '-',
+                        'extra': '-',
+                    }
+
+        def indexes():
+            if selected_column is not None:
+                return
+            with closing(self._connect(pathname)) as database:
+                for row in database.execute(
+                        'pragma index_list({})'.format(quoted)):
+                    index_name = row[1]
+                    columns = [
+                        info[2]
+                        for info in database.execute(
+                            'pragma index_info({})'.format(
+                                self._quoted(index_name)
+                            )
+                        )
+                    ]
+                    if any(column is None for column in columns):
+                        index_sql = database.execute(
+                            "select sql from sqlite_master "
+                            "where type='index' and name=?",
+                            (index_name,),
+                        ).fetchone()[0]
+                        columns = [index_sql]
+                    yield {
+                        'name': index_name,
+                        'unique': 'YES' if row[2] else 'NO',
+                        'columns': ', '.join(columns),
+                    }
+
         return {
             'type': root_type,
             'name': root_name,
             'columns': columns,
             'row_count': row_count,
             'rows': rows(),
+            'column_summaries': column_summaries(),
+            'indexes': indexes(),
         }
 
     def fetch(self, ref, count_rows=True):
@@ -392,9 +555,46 @@ class SQLiteConnector(BaseConnector):
                     pathname, name, count_rows=count_rows
                 )
 
+        def table_summaries():
+            with closing(self._connect(pathname)) as database:
+                for name in names:
+                    quoted = self._quoted(name)
+                    columns = sum(
+                        1 for row in self._schema(database, quoted)
+                        if row[6] != 1
+                    )
+                    rows = database.execute(
+                        'select count(*) from {}'.format(quoted)
+                    ).fetchone()[0]
+                    sample = list(database.execute(
+                        'select * from {} limit 100'.format(quoted)
+                    ))
+                    payload = sum(
+                        sum(
+                            0 if value is None else
+                            len(value) if isinstance(value, (bytes, bytearray)) else
+                            len(value.encode('utf-8')) if isinstance(value, str) else
+                            8
+                            for value in row
+                        )
+                        for row in sample
+                    )
+                    size = round(
+                        (payload / len(sample) if sample else 0)
+                        * rows / 1024 / 1024
+                    )
+                    yield {
+                        'name': name,
+                        'type': 'table',
+                        'columns': columns,
+                        'rows': rows,
+                        'size': size,
+                    }
+
         return {
             'type': 'database',
             'name': os.path.basename(pathname),
             'table_names': names,
             'tables': tables(),
+            'table_summaries': table_summaries(),
         }

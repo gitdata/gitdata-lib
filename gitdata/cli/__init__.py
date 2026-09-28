@@ -47,7 +47,16 @@ def get_module_doc(name):
 
 
 def main():
-    """CLI main"""
+    """CLI entry point with clean interrupt handling."""
+    try:
+        _main()
+    except KeyboardInterrupt:
+        print('\nInterrupted.', file=sys.stderr)
+        raise SystemExit(130)
+
+
+def _main():
+    """Parse and dispatch a CLI command."""
 
     if len(sys.argv) == 1:
         print_help(__doc__)

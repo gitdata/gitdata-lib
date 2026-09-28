@@ -36,7 +36,11 @@ repository root:
 ```bash
 # List tables, list one table's columns, scan the table, and scan one column.
 gitdata ls examples/inspection.sqlite
+# Add -v for table row/column counts and estimated sizes.
+gitdata ls -v examples/inspection.sqlite
 gitdata ls examples/inspection.sqlite/customers
+# On a table, -v shows schema details and indexes.
+gitdata ls -v examples/inspection.sqlite/customers
 gitdata scan --limit 2 examples/inspection.sqlite/customers
 gitdata scan --limit 2 examples/inspection.sqlite/customers.email
 
@@ -48,7 +52,16 @@ gitdata scan --limit 10 examples/locations-headered.csv
 Database scans issue `COUNT(*)` before sampling so the report normally includes
 an exact table row count. Use `--no-count` to skip that query when counting would
 be expensive; if the sample does not exhaust the rows, the report then shows a
-lower bound. Row sampling remains lazy and never reads beyond `--limit`.
+lower bound. Row sampling remains lazy and never reads beyond `--limit`. The
+command writes `Scanning...` to standard error before it starts connecting,
+counting, or sampling. Pressing Ctrl+C stops any command cleanly without a Python
+traceback.
+
+`gitdata ls -v` follows the detailed listings from `datascan`: server refs show
+database table/row/size statistics, database refs show table column/row/size
+statistics, and table refs show column schema and index details. Plain `ls`
+continues to print names only. SQLite sizes are estimated from up to 100 rows;
+MariaDB/MySQL row and size statistics come from `information_schema`.
 
 SQLite refs form a hierarchy beneath the database filename:
 
@@ -93,9 +106,11 @@ MARIADB_SERVER_REF='mysql://root@127.0.0.1:3307?password_env=GITDATA_EXAMPLE_MAR
 MARIADB_REF='mysql://root@127.0.0.1:3307/gitdata_example?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
 MARIADB_TABLE_REF='mysql://root@127.0.0.1:3307/gitdata_example.customers?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
 
-gitdata ls "$MARIADB_SERVER_REF"  # databases visible to root
-gitdata ls "$MARIADB_REF"         # tables in gitdata_example
-gitdata ls "$MARIADB_TABLE_REF"
+gitdata ls "$MARIADB_SERVER_REF"     # databases visible to root
+gitdata ls -v "$MARIADB_SERVER_REF"  # database statistics
+gitdata ls "$MARIADB_REF"            # tables in gitdata_example
+gitdata ls -v "$MARIADB_REF"         # table statistics
+gitdata ls -v "$MARIADB_TABLE_REF"   # column schema and indexes
 gitdata scan --limit 2 "$MARIADB_TABLE_REF"
 ```
 
