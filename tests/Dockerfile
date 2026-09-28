@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /src
 
-COPY README.md requirements.txt setup.py .noserc ./
+COPY README.md requirements.txt setup.py ./
 COPY gitdata ./gitdata
 COPY tests/requirements.txt ./tests/requirements.txt
 

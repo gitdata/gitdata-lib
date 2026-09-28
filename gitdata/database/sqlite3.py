@@ -2,6 +2,7 @@
     gitdata sqlite3 database
 """
 
+from datetime import date, datetime
 from decimal import Decimal
 import sqlite3
 import logging
@@ -57,13 +58,32 @@ class Sqlite3Database(Database):
             return str(value)
 
         def convert_decimal(bytetext):
-            """convert bytesring representatinos of decimal values to actual
-            Decimal values"""
+            """convert byte-string decimal values to Decimal values"""
             return Decimal(bytetext.decode())
+
+        def adapt_date(value):
+            """Store dates using the ISO 8601 representation."""
+            return value.isoformat()
+
+        def adapt_datetime(value):
+            """Store datetimes using the historical SQLite representation."""
+            return value.isoformat(' ')
+
+        def convert_date(bytetext):
+            """Restore ISO 8601 dates."""
+            return date.fromisoformat(bytetext.decode())
+
+        def convert_timestamp(bytetext):
+            """Restore ISO 8601 timestamps."""
+            return datetime.fromisoformat(bytetext.decode())
 
         kwargs.setdefault('isolation_level', None)  # autocommit
         sqlite3.register_adapter(Decimal, adapt_decimal)
         sqlite3.register_converter('decimal', convert_decimal)
+        sqlite3.register_adapter(date, adapt_date)
+        sqlite3.register_adapter(datetime, adapt_datetime)
+        sqlite3.register_converter('date', convert_date)
+        sqlite3.register_converter('timestamp', convert_timestamp)
 
         Database.__init__(self, sqlite3.connect, *args, **keyword_args)
 

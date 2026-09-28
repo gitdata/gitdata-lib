@@ -2,7 +2,7 @@
     gitdata utils
 """
 
-import collections
+import collections.abc
 import datetime
 import decimal
 import inspect
@@ -44,6 +44,9 @@ def test_uid_maker(start=0):
         n[0] += 1
         return str(n[0])
     return _new_id
+
+
+test_uid_maker.__test__ = False
 
 
 def id_for(*args):
@@ -735,7 +738,7 @@ class RecordList(list):
         return title + str(ItemList(rows, labels=labels)) + footer
 
 
-class OrderedSet(collections.MutableSet):
+class OrderedSet(collections.abc.MutableSet):
     """OrderedSet
 
     A set that preserves the order of the elements

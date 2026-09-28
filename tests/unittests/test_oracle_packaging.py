@@ -31,13 +31,17 @@ class TestOraclePackaging(unittest.TestCase):
                 for requirement in arguments['install_requires'])
         )
 
-    def test_package_targets_python_39_only(self):
+    def test_package_targets_python_39_through_312(self):
         arguments = self.setup_arguments()
 
-        self.assertEqual(arguments['python_requires'], '>=3.9,<3.10')
+        self.assertEqual(arguments['python_requires'], '>=3.9,<3.13')
         classifiers = arguments['classifiers']
-        self.assertIn('Programming Language :: Python :: 3.9', classifiers)
-        for unsupported in ('3.6', '3.7', '3.8'):
+        for supported in ('3.9', '3.10', '3.11', '3.12'):
+            self.assertIn(
+                'Programming Language :: Python :: {}'.format(supported),
+                classifiers,
+            )
+        for unsupported in ('3.6', '3.7', '3.8', '3.13'):
             self.assertNotIn(
                 'Programming Language :: Python :: {}'.format(unsupported),
                 classifiers,

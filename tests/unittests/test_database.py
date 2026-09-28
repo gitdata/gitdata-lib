@@ -14,7 +14,7 @@ import unittest
 import os
 
 from decimal import Decimal
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 
 import gitdata
 from gitdata.database import (
@@ -25,7 +25,7 @@ from gitdata.database import (
 )
 
 import warnings
-warnings.filterwarnings('ignore', '\(1051, "Unknown table.*')
+warnings.filterwarnings('ignore', r'\(1051, "Unknown table.*')
 
 logger = logging.getLogger(__name__)
 
@@ -82,12 +82,12 @@ class DatabaseTests:
         """)
         recordset = db('select * from gitdata_test_table')
         for rec in recordset:
-            self.assertEquals(rec, ("1234", 50, date(2005,1,14), "Hello there"))
+            self.assertEqual(rec, ("1234", 50, date(2005,1,14), "Hello there"))
             break
 
     def test_db_create_drop_table(self):
         db = self.db
-        self.assert_('gitdata_test_table' not in db.get_table_names())
+        self.assertTrue('gitdata_test_table' not in db.get_table_names())
         db("""
             create table gitdata_test_table (
                 ID CHAR(10),
@@ -96,9 +96,9 @@ class DatabaseTests:
                 NOTES TEXT
            )
         """)
-        self.assert_('gitdata_test_table' in db.get_table_names())
+        self.assertTrue('gitdata_test_table' in db.get_table_names())
         db('drop table gitdata_test_table')
-        self.assert_('gitdata_test_table' not in db.get_table_names())
+        self.assertTrue('gitdata_test_table' not in db.get_table_names())
 
     def test_get_table_names(self):
         db = self.db
@@ -106,7 +106,7 @@ class DatabaseTests:
         for i in range(n):
             table_name = 'gitdata_test_table{}'.format(i)
             db('drop table if exists ' + table_name)
-            self.assert_(table_name not in db.get_table_names())
+            self.assertTrue(table_name not in db.get_table_names())
             db("""
                create table {} (
                  ID CHAR(10),
@@ -115,12 +115,12 @@ class DatabaseTests:
                  NOTES TEXT
                )
             """.format(table_name))
-            self.assert_(table_name in db.get_table_names())
+            self.assertTrue(table_name in db.get_table_names())
 
         for i in range(n):
             table_name = 'gitdata_test_table{}'.format(i)
             db('drop table ' + table_name)
-            self.assert_(table_name not in db.get_table_names())
+            self.assertTrue(table_name not in db.get_table_names())
 
     def test_db_insert_update_record(self):
         # pylint: disable=protected-access
@@ -516,6 +516,26 @@ class TestSqlite3Database(unittest.TestCase, DatabaseTests):
             ]
         )
         self.db.debug = True
+
+    def test_date_round_trip_has_no_deprecated_default_adapter_warning(self):
+        self.db('create table gitdata_test_table (value date)')
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', DeprecationWarning)
+            self.db('insert into gitdata_test_table values (%s)', date(2026, 9, 28))
+            result = self.db('select value from gitdata_test_table')
+            self.assertEqual(list(result), [(date(2026, 9, 28),)])
+
+    def test_datetime_round_trip_preserves_fractional_seconds_and_offset(self):
+        self.db('create table gitdata_test_table (value timestamp)')
+        expected = datetime(
+            2026, 9, 28, 15, 30, 45, 123456,
+            tzinfo=timezone(timedelta(hours=-7)),
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', DeprecationWarning)
+            self.db('insert into gitdata_test_table values (%s)', expected)
+            result = self.db('select value from gitdata_test_table')
+            self.assertEqual(list(result), [(expected,)])
 
     # def test_create_site_tables(self):
     #     self.db.create_site_tables()

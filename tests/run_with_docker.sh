@@ -162,9 +162,8 @@ fi
 
 phase 'Running general, Oracle unit, and SQLite tests'
 "$DOCKER" run --rm "$TEST_IMAGE" sh -c '
-    python -m nose -c .noserc gitdata $(printf "%s\n" tests/unittests/test_*.py | grep -v database) &&
-    python -m nose -c .noserc tests/unittests/test_database_oracle.py &&
-    python -m nose -c .noserc tests/unittests/test_database.py:TestSqlite3Database
+    python -m pytest --doctest-modules --cov=gitdata -q gitdata tests/unittests --ignore=tests/unittests/test_database.py &&
+    python -m pytest -q tests/unittests/test_database.py::TestSqlite3Database
 '
 
 phase 'Running MariaDB tests'
@@ -186,8 +185,8 @@ wait_for_mariadb
     -e GITDATA_TEST_MYSQL_INSPECTION_DATABASE=gitdata_example \
     "$TEST_IMAGE" \
     sh -c '
-        python -m nose -c .noserc tests/unittests/test_database.py:TestMySQLDatabase &&
-        python -m nose -c .noserc tests/unittests/test_direct_inspection.py:MySQLDirectInspectionTests
+        python -m pytest -q tests/unittests/test_database.py::TestMySQLDatabase &&
+        python -m pytest -q tests/unittests/test_direct_inspection.py::MySQLDirectInspectionTests
     '
 cleanup_active
 
@@ -201,8 +200,8 @@ wait_for_postgres
     -e GITDATA_TEST_POSTGRES_DATABASE_USER=postgres \
     -e GITDATA_TEST_POSTGRES_DATABASE_PASSWORD=password \
     "$TEST_IMAGE" \
-    python -m nose -c .noserc \
-    tests/unittests/test_database.py:TestPostgreSQLDatabase
+    python -m pytest -q \
+    tests/unittests/test_database.py::TestPostgreSQLDatabase
 cleanup_active
 
 phase 'Running Oracle integration tests'
@@ -227,7 +226,7 @@ wait_for_oracle
     -e GITDATA_TEST_ORACLE_USER=GITDATA_TEST \
     -e GITDATA_TEST_ORACLE_PASSWORD=GitDataApp123 \
     "$TEST_IMAGE" \
-    python -m nose -c .noserc tests/integration/test_database_oracle.py
+    python -m pytest -q tests/integration/test_database_oracle.py
 cleanup_active
 cleanup_test_image
 

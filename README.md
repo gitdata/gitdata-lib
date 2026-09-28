@@ -6,11 +6,11 @@ with a rich set of commands that provide ways to gather, manage and query data i
 
 ## Development installation
 
-Install the checkout into a Python 3.9 virtual environment so the `gitdata`
-command works without setting `PYTHONPATH`:
+Install the checkout into a Python 3.9 through 3.12 virtual environment so the
+`gitdata` command works without setting `PYTHONPATH` (Python 3.12 is shown):
 
 ```bash
-python3.9 -m venv .venv
+python3.12 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
 gitdata --help
@@ -22,7 +22,7 @@ Alternatively, if `pipx` is installed, put the editable command on your normal
 `PATH` without activating a project environment:
 
 ```bash
-pipx install --python python3.9 --editable .
+pipx install --python python3.12 --editable .
 ```
 
 ## Direct inspection
@@ -152,11 +152,16 @@ docker rm -f gitdata-example-mariadb
 
 ## Running the complete test suite locally
 
-Docker is the only host dependency for the complete Python 3.9 test matrix:
+Docker is the only host dependency for the complete database-backed Python 3.9
+suite:
 
 ```bash
 bash tests/run_with_docker.sh
 ```
+
+CI additionally runs the general and SQLite suites on Python 3.9, 3.10, 3.11,
+and 3.12, and runs the MariaDB, PostgreSQL, and Oracle integration jobs on
+both Python 3.9 and 3.12.
 
 The runner builds a disposable test image, runs the general and SQLite suites,
 and then starts MariaDB, PostgreSQL, and Oracle Free Lite one at a time. Each
