@@ -5,6 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- support and test Python 3.9 through 3.12
+- replace removed `collections` aliases with `collections.abc`
+- update PostgreSQL and CLI dependencies for Python 3.12
+- register explicit SQLite date and timestamp adapters and converters
+- run pytest-based CI and local test workflows across supported Python versions and database integrations
 
 ## [v0.0.17] - 2026-09-28
 - add direct `gitdata ls` and streaming `gitdata scan` for CSV, SQLite, and MariaDB refs without digestion or storage

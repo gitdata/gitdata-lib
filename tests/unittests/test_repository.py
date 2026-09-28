@@ -4,8 +4,9 @@
 # pylint: disable=missing-docstring, no-member
 
 import os
-
+import tempfile
 import unittest
+
 import gitdata.repositories
 
 
@@ -34,27 +35,19 @@ class RepositorySuite:
 class TestLocalRepositorySetup(unittest.TestCase):
 
     def test_init(self):
-        working_directory = 'tmp'
-        path = working_directory + '/.gitdata'
-        if os.path.isfile(path):
-            os.remove(path)
-        self.assertFalse(os.path.exists(path))
-        gitdata.repositories.create_respository(working_directory)
-        try:
+        with tempfile.TemporaryDirectory() as working_directory:
+            path = os.path.join(working_directory, '.gitdata')
+            self.assertFalse(os.path.exists(path))
+            gitdata.repositories.create_respository(working_directory)
             repository = gitdata.repositories.Repository(working_directory)
-            self.assertTrue(os.path.isfile(path))
-        finally:
-            del repository
-            gitdata.repositories.remove_respository(working_directory)
+            try:
+                self.assertTrue(os.path.isfile(path))
+            finally:
+                del repository
 
     def test_init_repository_is_idempotent(self):
-        working_directory = 'tmp'
-        path = working_directory + '/.gitdata'
-        gitdata.repositories.remove_respository(working_directory)
-        if not os.path.exists(working_directory):
-            os.mkdir(working_directory)
-
-        try:
+        with tempfile.TemporaryDirectory() as working_directory:
+            path = os.path.join(working_directory, '.gitdata')
             repository_path, created = gitdata.repositories.init_repository(working_directory)
             self.assertTrue(created)
             self.assertEqual(repository_path, path)
@@ -63,37 +56,27 @@ class TestLocalRepositorySetup(unittest.TestCase):
             repository_path, created = gitdata.repositories.init_repository(working_directory)
             self.assertFalse(created)
             self.assertEqual(repository_path, path)
-        finally:
-            gitdata.repositories.remove_respository(working_directory)
 
     def test_init_repository_from_file_path(self):
-        working_directory = 'tmp'
-        path = working_directory + '/.gitdata'
-        gitdata.repositories.remove_respository(working_directory)
-        if not os.path.exists(working_directory):
-            os.mkdir(working_directory)
-
-        try:
+        with tempfile.TemporaryDirectory() as working_directory:
+            path = os.path.join(working_directory, '.gitdata')
             repository_path, created = gitdata.repositories.init_repository(path)
             self.assertTrue(created)
             self.assertEqual(repository_path, path)
             self.assertTrue(os.path.isfile(path))
-        finally:
-            gitdata.repositories.remove_respository(working_directory)
 
 
 class TestLocalRepository(RepositorySuite, unittest.TestCase):
 
     def setUp(self):
-        self.working_directory = working_directory = 'tmp'
-        gitdata.repositories.remove_respository(working_directory)
-        if not os.path.exists(working_directory):
-            os.mkdir(working_directory)
-        gitdata.repositories.create_respository(working_directory)
-        self.repository = gitdata.repositories.Repository(working_directory)
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.working_directory = self._tmpdir.name
+        gitdata.repositories.create_respository(self.working_directory)
+        self.repository = gitdata.repositories.Repository(self.working_directory)
 
     def tearDown(self):
-        gitdata.repositories.remove_respository(self.working_directory)
+        del self.repository
+        self._tmpdir.cleanup()
 
 
 class TestMemoryRepository(RepositorySuite, unittest.TestCase):

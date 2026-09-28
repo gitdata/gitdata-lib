@@ -6,7 +6,7 @@
     A database module that does less.
 """
 
-import collections
+import collections.abc
 import inspect
 import logging
 import os
@@ -134,7 +134,7 @@ class Database:
             """test for a sequence type that is not a string"""
             if isinstance(obj, (str, bytes)):
                 return False
-            return isinstance(obj, collections.Sequence)
+            return isinstance(obj, collections.abc.Sequence)
 
         if self.paramstyle == 'qmark':
             if not many and len(args) == 1 and hasattr(args[0], 'items') and args[0]:

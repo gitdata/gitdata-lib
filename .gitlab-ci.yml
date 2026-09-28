@@ -1,22 +1,50 @@
-
 stages:
   - test
 
-before_script:
+.test:
+  before_script:
     - pip install .
     - pip install -r tests/requirements.txt
 
-general:
+general-3.9:
+  extends: .test
   stage: test
   image: python:3.9
   script:
-    - nosetests -c .noserc gitdata $(ls tests/unittests/test_*.py | grep -v database)
-    - nosetests -c .noserc tests/unittests/test_database_oracle.py
-    - nosetests -c .noserc tests/unittests/test_database.py:TestSqlite3Database
+    - pytest --doctest-modules --cov=gitdata -q gitdata tests/unittests --ignore=tests/unittests/test_database.py
+    - pytest -q tests/unittests/test_database.py::TestSqlite3Database
+
+general-3.10:
+  extends: .test
+  stage: test
+  image: python:3.10
+  script:
+    - pytest --doctest-modules --cov=gitdata -q gitdata tests/unittests --ignore=tests/unittests/test_database.py
+    - pytest -q tests/unittests/test_database.py::TestSqlite3Database
+
+general-3.11:
+  extends: .test
+  stage: test
+  image: python:3.11
+  script:
+    - pytest --doctest-modules --cov=gitdata -q gitdata tests/unittests --ignore=tests/unittests/test_database.py
+    - pytest -q tests/unittests/test_database.py::TestSqlite3Database
+
+general-3.12:
+  extends: .test
+  stage: test
+  image: python:3.12
+  script:
+    - pytest --doctest-modules --cov=gitdata -q gitdata tests/unittests --ignore=tests/unittests/test_database.py
+    - pytest -q tests/unittests/test_database.py::TestSqlite3Database
 
 mariadb:
+  extends: .test
   stage: test
-  image: python:3.9
+  image: python:$PYTHON_VERSION
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ['3.9', '3.12']
   services:
     - name: mariadb:10.7@sha256:9a48ac9f196f3d4fd6fea2cab59a49df9e7ca459bf14b2f7b85a0e38a5454571
       alias: mariadb
@@ -27,11 +55,15 @@ mariadb:
     GITDATA_TEST_MYSQL_DATABASE_USER: root
     GITDATA_TEST_MYSQL_DATABASE_PASSWORD: root
   script:
-    - nosetests -c .noserc tests/unittests/test_database.py:TestMySQLDatabase
+    - pytest -q tests/unittests/test_database.py::TestMySQLDatabase
 
 postgres:
+  extends: .test
   stage: test
-  image: python:3.9
+  image: python:$PYTHON_VERSION
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ['3.9', '3.12']
   services:
     - name: postgres:18.6@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
       alias: postgres
@@ -39,16 +71,20 @@ postgres:
     POSTGRES_PASSWORD: password
     GITDATA_TEST_POSTGRES_DATABASE_HOST: postgres
   script:
-    - nosetests -c .noserc tests/unittests/test_database.py:TestPostgreSQLDatabase
+    - pytest -q tests/unittests/test_database.py::TestPostgreSQLDatabase
 
 oracle:
+  extends: .test
   stage: test
-  image: python:3.9
+  image: python:$PYTHON_VERSION
+  parallel:
+    matrix:
+      - PYTHON_VERSION: ['3.9', '3.12']
   services:
     - name: container-registry.oracle.com/database/free@sha256:770ca58ab319d8cfde610b0db25c06899ce0af9591c4addfa10d2cb8f0318e65
       alias: oracle
   variables:
-    # This password is used only by the isolated, disposable CI service.
+    # These passwords are used only by the isolated, disposable CI service.
     ORACLE_PWD: GitDataCi123
     GITDATA_TEST_ORACLE_HOST: oracle
     GITDATA_TEST_ORACLE_PORT: '1521'
@@ -60,4 +96,4 @@ oracle:
     - pip install -r tests/requirements.txt
   script:
     - python tests/integration/setup_oracle.py
-    - nosetests -c .noserc tests/integration/test_database_oracle.py
+    - pytest -q tests/integration/test_database_oracle.py
