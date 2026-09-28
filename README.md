@@ -76,11 +76,12 @@ Keep the password out of the ref by naming an environment variable:
 export GITDATA_EXAMPLE_MARIADB_PASSWORD=example
 MARIADB_SERVER_REF='mysql://root@127.0.0.1:3307?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
 MARIADB_REF='mysql://root@127.0.0.1:3307/gitdata_example?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
+MARIADB_TABLE_REF='mysql://root@127.0.0.1:3307/gitdata_example.customers?password_env=GITDATA_EXAMPLE_MARIADB_PASSWORD'
 
 gitdata ls "$MARIADB_SERVER_REF"  # databases visible to root
 gitdata ls "$MARIADB_REF"         # tables in gitdata_example
-gitdata ls "${MARIADB_REF}#customers"
-gitdata scan --limit 2 "${MARIADB_REF}#customers"
+gitdata ls "$MARIADB_TABLE_REF"
+gitdata scan --limit 2 "$MARIADB_TABLE_REF"
 ```
 
 If the username is omitted, the connector uses the current operating-system
@@ -93,6 +94,20 @@ gitdata ls 'mysql://zeno'
 
 Inline passwords remain unsupported; use `password_env` when a password is
 required.
+
+MariaDB/MySQL refs follow the SQL qualification users already expect:
+
+```text
+mysql://host                         server
+mysql://host/database                database
+mysql://host/database.table          table
+```
+
+The earlier `database#table` form used a URI fragment as a generic nested-resource
+selector. It remains accepted for compatibility, but `database.table` is the
+canonical MariaDB/MySQL spelling. A literal dot inside an identifier must be
+percent-encoded as `%2E`. File-based refs such as SQLite continue to use
+`#table`, because dots are already part of their path and filename syntax.
 
 Remove the disposable database when finished:
 

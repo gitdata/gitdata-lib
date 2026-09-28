@@ -118,6 +118,44 @@ class DirectInspectionTests(unittest.TestCase):
             autocommit=True,
         )
 
+    def test_mysql_ref_accepts_database_dot_table_selection(self):
+        config, table = MariaDBConnector()._parts(
+            'mysql://localhost/cocal.cal_event'
+        )
+
+        self.assertEqual(config['database'], 'cocal')
+        self.assertEqual(table, 'cal_event')
+
+    def test_mysql_ref_keeps_fragment_table_selection_compatible(self):
+        config, table = MariaDBConnector()._parts(
+            'mysql://localhost/cocal#cal_event'
+        )
+
+        self.assertEqual(config['database'], 'cocal')
+        self.assertEqual(table, 'cal_event')
+
+    def test_mysql_fragment_disambiguates_dotted_database_name(self):
+        config, table = MariaDBConnector()._parts(
+            'mysql://localhost/archive.2026#cal_event'
+        )
+
+        self.assertEqual(config['database'], 'archive.2026')
+        self.assertEqual(table, 'cal_event')
+
+    def test_mysql_ref_preserves_encoded_dot_in_database_name(self):
+        config, table = MariaDBConnector()._parts(
+            'mysql://localhost/archive%2E2026'
+        )
+
+        self.assertEqual(config['database'], 'archive.2026')
+        self.assertIsNone(table)
+
+    def test_mysql_ref_rejects_extra_path_segments_after_dotted_table(self):
+        with self.assertRaisesRegex(ValueError, 'database and table'):
+            MariaDBConnector()._parts(
+                'mysql://localhost/cocal.cal_event/extra'
+            )
+
     def test_mariadb_inline_passwords_are_rejected_without_echoing_them(self):
         password = '-'.join(('not', 'for', 'logs'))
         ref = 'mysql://root:{}@127.0.0.1/gitdata_example'.format(password)
@@ -320,12 +358,34 @@ class DirectInspectionTests(unittest.TestCase):
             'id,name\n1,Ada\n2,Grace\n3,Linus\n',
         )
 
-        output = self.run_cli('scan', '--limit', '2', pathname)
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((100, 24))):
+            output = self.run_cli('scan', '--limit', '2', pathname)
 
         self.assertIn('customers.csv: 2 columns, at least 2 rows (sampled)', output)
-        self.assertIn('Column\tData Types\tCardinality\tSize\tObserved Values', output)
-        self.assertIn('id\tstring\t~2\t1\t1, 2', output)
-        self.assertIn('name\tstring\t~2\t5\tAda, Grace', output)
+        self.assertNotIn('\t', output)
+        self.assertTrue(all(line == line.rstrip() for line in output.splitlines()))
+        self.assertIn(
+            'Columns                        Data Types   Cardinality     Size '
+            'Observed Values',
+            output,
+        )
+        self.assertIn(
+            '------------------------------ ------------ ----------- '
+            '-------- ----------------------------------',
+            output,
+        )
+        self.assertIn(
+            'id                             string                ~2        1 '
+            '1, 2',
+            output,
+        )
+        self.assertIn(
+            'name                           string                ~2        5 '
+            'Ada, Grace',
+            output,
+        )
 
 
 @unittest.skipUnless(
@@ -356,6 +416,13 @@ class MySQLDirectInspectionTests(unittest.TestCase):
             self.database,
             password_name,
         )
+        self.table_ref = 'mysql://{}@{}:{}/{}.customers?password_env={}'.format(
+            user,
+            host,
+            port,
+            self.database,
+            password_name,
+        )
 
     def test_mariadb_server_ref_lists_visible_databases(self):
         items = list_items(fetch(self.server_ref))
@@ -377,7 +444,7 @@ class MySQLDirectInspectionTests(unittest.TestCase):
             'type', 'name', 'table_names', 'tables',
         })
 
-        table = fetch(self.ref + '#customers')
+        table = fetch(self.table_ref)
         self.assertEqual(table['columns'], (
             'customer_id',
             'name',

@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 - add direct `gitdata ls` and streaming `gitdata scan` for CSV, SQLite, and MariaDB refs without digestion or storage
 - allow `gitdata ls` on a MariaDB server ref to list databases visible to the user
+- accept canonical `database.table` selection in MariaDB/MySQL refs while retaining `#table` compatibility
+- format `gitdata scan` as a terminal-width-aware table with aligned numeric columns and bounded values
 - default omitted MariaDB usernames to the current OS user and attempt passwordless authentication when no password environment variable is specified
 - add reusable CSV, SQLite, and `mysqldump` examples for manual inspection
 - distinguish node relationships from literal values with structural predicates

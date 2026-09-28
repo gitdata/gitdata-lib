@@ -77,12 +77,36 @@ class MariaDBConnector(BaseConnector):
                 )
             )
 
-        database = unquote(parts.path.lstrip('/'))
-        if not parts.hostname or '/' in database:
+        raw_database = parts.path.lstrip('/')
+        if '/' in raw_database:
+            raise ValueError(
+                'MariaDB refs accept only one database and table selection'
+            )
+        fragment_table = unquote(parts.fragment) if parts.fragment else None
+        dotted_table = None
+        if fragment_table:
+            database = unquote(raw_database)
+        elif '.' in raw_database:
+            if raw_database.count('.') != 1:
+                raise ValueError(
+                    'MariaDB refs accept one database.table selection'
+                )
+            raw_database, raw_table = raw_database.split('.', 1)
+            if not raw_database or not raw_table:
+                raise ValueError(
+                    'MariaDB dotted refs require both database and table names'
+                )
+            database = unquote(raw_database)
+            dotted_table = unquote(raw_table)
+        else:
+            database = unquote(raw_database)
+        table = dotted_table or fragment_table
+
+        if not parts.hostname or '/' in database or (table and '/' in table):
             raise ValueError(
                 'MariaDB refs require a host and at most one database name'
             )
-        if not database and parts.fragment:
+        if not database and table:
             raise ValueError(
                 'MariaDB table refs require a database name'
             )
@@ -117,7 +141,6 @@ class MariaDBConnector(BaseConnector):
         }
         if database:
             config['database'] = database
-        table = unquote(parts.fragment) if parts.fragment else None
         return config, table
 
     @staticmethod
