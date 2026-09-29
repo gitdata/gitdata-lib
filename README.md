@@ -161,15 +161,15 @@ gitdata scan --help
 
 ## Oracle
 
-Install the optional Oracle driver, then keep the password in an environment
-variable:
+Install the optional Oracle driver, then set the password. GitData reads
+`PASSWORD` by default:
 
 ```bash
 python3 -m pip install 'gitdata-lib[oracle]'
-export ORACLE_PASSWORD='your-password'
+export PASSWORD='your-password'
 
-DATABASE='oracle://app@db.example.com:1521/FREEPDB1?password_env=ORACLE_PASSWORD'
-TABLE="${DATABASE}#orders"
+DATABASE='oracle://app@db.example.com/FREEPDB1'
+TABLE="${DATABASE}/orders"
 ```
 
 Explore the service and its tables with the same commands:
@@ -188,14 +188,23 @@ gitdata ls -l "$TABLE"
 gitdata scan --limit 10 "$TABLE"
 ```
 
-Oracle references follow this shape:
+Oracle references follow this shape; port `1521` may be omitted:
 
 ```text
-oracle://user@host:port/service?password_env=ENVIRONMENT_VARIABLE
-oracle://user@host:port/service?password_env=ENVIRONMENT_VARIABLE#table
+oracle://user@host:port/service
+oracle://user@host:port/service/table
+```
+
+To use a password variable other than `PASSWORD`, set
+`GITDATA_PASSWORD_ENV` to its name:
+
+```bash
+export GITDATA_PASSWORD_ENV=ORACLE_PASSWORD
+export ORACLE_PASSWORD='your-password'
 ```
 
 Inline passwords are not accepted. Ordinary Oracle table and column names are
 shown in lowercase. Quoted identifiers are shown with their double quotes so
 names that differ only by Oracle quoting remain distinct; use the displayed
-spelling after `#` when selecting one (the quotes may be URL-encoded as `%22`).
+spelling as the final path component when selecting one (the quotes may be
+URL-encoded as `%22`).

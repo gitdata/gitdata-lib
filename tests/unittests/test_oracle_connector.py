@@ -18,6 +18,14 @@ from gitdata.connectors.oracle import OracleConnector
 
 class OracleConnectorTests(unittest.TestCase):
 
+    def setUp(self):
+        password = patch.dict(
+            os.environ,
+            {'GITDATA_PASSWORD_ENV': 'PASSWORD', 'PASSWORD': 'secret'},
+        )
+        password.start()
+        self.addCleanup(password.stop)
+
     def run_cli(self, *arguments):
         output = StringIO()
         error = StringIO()
@@ -62,6 +70,63 @@ class OracleConnectorTests(unittest.TestCase):
         )
         self.assertEqual(table, 'Customers')
 
+    def test_ref_uses_path_table_default_port_and_password_variable(self):
+        config, table = OracleConnector()._parts(
+            'oracle://app@db.example/FREEPDB1/products'
+        )
+
+        self.assertEqual(
+            config,
+            {
+                'host': 'db.example',
+                'port': 1521,
+                'service_name': 'FREEPDB1',
+                'user': 'app',
+                'password': 'secret',
+            },
+        )
+        self.assertEqual(table, 'products')
+
+    def test_ref_uses_password_variable_named_by_gitdata_password_env(self):
+        environment = {
+            'GITDATA_PASSWORD_ENV': 'ORACLE_PASSWORD',
+            'ORACLE_PASSWORD': 'custom-secret',
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            config, table = OracleConnector()._parts(
+                'oracle://app@db.example/FREEPDB1/products'
+            )
+
+        self.assertEqual(config['password'], 'custom-secret')
+        self.assertEqual(table, 'products')
+
+    def test_ref_reports_missing_default_password_environment_variable(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(
+                    ValueError,
+                    "Oracle password environment variable 'PASSWORD' is not set"):
+                OracleConnector()._parts(
+                    'oracle://app@db.example/FREEPDB1/products'
+                )
+
+    def test_ref_rejects_empty_gitdata_password_env(self):
+        with patch.dict(
+                os.environ, {'GITDATA_PASSWORD_ENV': ''}, clear=True):
+            with self.assertRaisesRegex(
+                    ValueError,
+                    'GITDATA_PASSWORD_ENV must name an environment variable'):
+                OracleConnector()._parts(
+                    'oracle://app@db.example/FREEPDB1/products'
+                )
+
+    def test_ref_rejects_more_than_service_and_table_path(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                'Oracle refs accept a service and optional table path'):
+            OracleConnector()._parts(
+                'oracle://app@db.example/FREEPDB1/products/extra'
+            )
+
     def test_ref_rejects_inline_passwords(self):
         with self.assertRaisesRegex(
                 ValueError, 'Inline Oracle passwords are not supported'):
@@ -82,8 +147,8 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 1)
         self.assertEqual(
             error.getvalue(),
-            'gitdata: Inline Oracle passwords are not supported; use '
-            'password_env\n',
+            'gitdata: Inline Oracle passwords are not supported; set PASSWORD '
+            'or name another variable with GITDATA_PASSWORD_ENV\n',
         )
 
     def test_debug_output_redacts_inline_password(self):
@@ -107,7 +172,6 @@ class OracleConnectorTests(unittest.TestCase):
             'oracle://db.example/FREEPDB1',
             'oracle://app@/FREEPDB1',
             'oracle://app@db.example',
-            'oracle://app@db.example/first/second',
         )
         for ref in refs:
             with self.subTest(ref=ref):
@@ -197,7 +261,7 @@ class OracleConnectorTests(unittest.TestCase):
             'db.example', 1521, service_name='FREEPDB1'
         )
         driver.connect.assert_called_once_with(
-            user='app', password=None, dsn='db.example:1521/FREEPDB1'
+            user='app', password='secret', dsn='db.example:1521/FREEPDB1'
         )
         cursor.execute.assert_called_once_with(
             'select table_name from user_tables order by table_name'
@@ -325,7 +389,8 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertEqual(
             error.getvalue(),
             "gitdata: Oracle credentials were not provided for user 'app'. "
-            'Set password_env in the Oracle ref.\n',
+            'Set PASSWORD or name another variable with '
+            'GITDATA_PASSWORD_ENV.\n',
         )
 
     def test_unknown_oracle_service_exits_with_helpful_message(self):
@@ -367,7 +432,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
-                'ls', 'oracle://app@db.example/FREEPDB1#customers'
+                'ls', 'oracle://app@db.example/FREEPDB1/customers'
             )
 
         self.assertEqual(output, 'id\n"DisplayName"\n')
@@ -395,7 +460,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
-                'ls', '-l', 'oracle://app@db.example/FREEPDB1#CUSTOMERS'
+                'ls', '-l', 'oracle://app@db.example/FREEPDB1/CUSTOMERS'
             )
 
         self.assertEqual(error, '')
@@ -465,7 +530,7 @@ class OracleConnectorTests(unittest.TestCase):
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
                 'scan', '--no-count', '--limit', '2',
-                'oracle://app@db.example/FREEPDB1#customers'
+                'oracle://app@db.example/FREEPDB1/customers'
             )
 
         self.assertIn('customers: 2 columns, at least 2 rows (sampled)', output)
@@ -506,7 +571,7 @@ class OracleConnectorTests(unittest.TestCase):
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
                 'scan', '--no-count', '--limit', '1',
-                'oracle://app@db.example/FREEPDB1#DOCUMENTS'
+                'oracle://app@db.example/FREEPDB1/DOCUMENTS'
             )
 
         self.assertEqual(lob.read_args, (1, 4096))
@@ -541,7 +606,7 @@ class OracleConnectorTests(unittest.TestCase):
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
                 'scan', '--limit', '2',
-                'oracle://app@db.example/FREEPDB1#CUSTOMERS'
+                'oracle://app@db.example/FREEPDB1/CUSTOMERS'
             )
 
         self.assertIn('customers: 1 column, 3 rows (sampled)', output)
@@ -630,7 +695,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'scan', '--no-count',
-                     'oracle://app@db.example/FREEPDB1#CUSTOMERS']):
+                     'oracle://app@db.example/FREEPDB1/CUSTOMERS']):
                 with redirect_stderr(error), redirect_stdout(StringIO()):
                     with self.assertRaises(SystemExit) as raised:
                         main()
@@ -662,7 +727,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'scan', '--no-count',
-                     'oracle://app@db.example/FREEPDB1#CUSTOMERS']):
+                     'oracle://app@db.example/FREEPDB1/CUSTOMERS']):
                 with redirect_stderr(error), redirect_stdout(StringIO()):
                     with self.assertRaises(SystemExit) as raised:
                         main()
@@ -685,7 +750,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'ls',
-                     'oracle://app@db.example/FREEPDB1#missing']):
+                     'oracle://app@db.example/FREEPDB1/missing']):
                 with redirect_stderr(error):
                     with self.assertRaises(SystemExit) as raised:
                         main()

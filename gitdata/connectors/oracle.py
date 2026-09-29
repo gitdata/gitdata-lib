@@ -59,13 +59,27 @@ class OracleConnector(BaseConnector):
                     )
                 )
             )
-        raw_service_name = parts.path.lstrip('/')
-        service_name = unquote(raw_service_name)
-        if (
-                not parts.username
-                or not parts.hostname
-                or not service_name
-                or '/' in service_name):
+        raw_path = parts.path.lstrip('/')
+        raw_components = raw_path.split('/') if raw_path else []
+        if not parts.username or not parts.hostname or not raw_components:
+            raise OracleRefError(
+                'Oracle refs require a user, host, and service name'
+            )
+        if len(raw_components) > 2 or not all(raw_components):
+            raise OracleRefError(
+                'Oracle refs accept a service and optional table path'
+            )
+        service_name = unquote(raw_components[0])
+        path_table = (
+            unquote(raw_components[1]) if len(raw_components) == 2 else None
+        )
+        fragment_table = unquote(parts.fragment) if parts.fragment else None
+        if path_table and fragment_table:
+            raise OracleRefError(
+                'Oracle refs accept only one table selection'
+            )
+        table = path_table or fragment_table
+        if '/' in service_name:
             raise OracleRefError(
                 'Oracle refs require a user, host, and service name'
             )
@@ -75,24 +89,31 @@ class OracleConnector(BaseConnector):
             raise OracleRefError('Oracle refs require a valid port') from None
         if parts.password is not None:
             raise OracleRefError(
-                'Inline Oracle passwords are not supported; use password_env'
+                'Inline Oracle passwords are not supported; set PASSWORD or '
+                'name another variable with GITDATA_PASSWORD_ENV'
             )
-        password = None
         password_env = query.get('password_env', ())
         if password_env and (
                 len(password_env) != 1 or not password_env[0]):
             raise OracleRefError(
                 'password_env must name exactly one environment variable'
             )
-        if password_env:
-            variable = password_env[0]
-            try:
-                password = os.environ[variable]
-            except KeyError:
-                raise OracleRefError(
-                    'Oracle password environment variable {!r} is not set'
-                    .format(variable)
-                )
+        variable = (
+            password_env[0]
+            if password_env
+            else os.environ.get('GITDATA_PASSWORD_ENV', 'PASSWORD')
+        )
+        if not variable:
+            raise OracleRefError(
+                'GITDATA_PASSWORD_ENV must name an environment variable'
+            )
+        try:
+            password = os.environ[variable]
+        except KeyError:
+            raise OracleRefError(
+                'Oracle password environment variable {!r} is not set'
+                .format(variable)
+            )
         config = {
             'host': parts.hostname,
             'port': port,
@@ -100,7 +121,6 @@ class OracleConnector(BaseConnector):
             'user': unquote(parts.username),
             'password': password,
         }
-        table = unquote(parts.fragment) if parts.fragment else None
         return config, table
 
     @staticmethod
@@ -148,7 +168,8 @@ class OracleConnector(BaseConnector):
         elif full_code == 'DPY-4001':
             message = (
                 'Oracle credentials were not provided for user {!r}. Set '
-                'password_env in the Oracle ref.'.format(config['user'])
+                'PASSWORD or name another variable with '
+                'GITDATA_PASSWORD_ENV.'.format(config['user'])
             )
         elif full_code in ('ORA-12514', 'DPY-6001'):
             message = (
