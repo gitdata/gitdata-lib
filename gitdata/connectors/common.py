@@ -98,6 +98,10 @@ def explore(node, destination):
 #                 yield a, b
 
 
+class ConnectorError(Exception):
+    """Raised when a Connector cannot complete an expected operation."""
+
+
 class UnsupportedRef(ValueError):
     """Raised when no Connector can resolve a ref."""
 

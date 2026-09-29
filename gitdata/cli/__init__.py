@@ -24,6 +24,7 @@ import sys
 from docopt import docopt
 
 import gitdata
+from gitdata.connectors.common import ConnectorError
 from gitdata.utils import trim
 
 
@@ -53,6 +54,9 @@ def main():
     except KeyboardInterrupt:
         print('\nInterrupted.', file=sys.stderr)
         raise SystemExit(130)
+    except ConnectorError as error:
+        print('gitdata: {}'.format(error), file=sys.stderr)
+        raise SystemExit(1)
 
 
 def _main():

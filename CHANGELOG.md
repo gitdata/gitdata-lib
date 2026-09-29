@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- show actionable CLI errors for MariaDB/MySQL connection, authentication, and database-selection failures instead of tracebacks
 
 ## [v0.0.18] - 2026-09-28
 - support and test Python 3.9 through 3.12

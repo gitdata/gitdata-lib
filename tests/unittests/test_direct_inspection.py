@@ -43,6 +43,138 @@ class DirectInspectionTests(unittest.TestCase):
                     main()
         return output.getvalue()
 
+    def test_mysql_unknown_server_exits_with_helpful_message(self):
+        error = StringIO()
+        connection_error = pymysql.err.OperationalError(
+            2003,
+            "Can't connect to MySQL server on 'myserver' "
+            '([Errno -2] Name or service not known)',
+        )
+
+        with patch.object(
+                sys, 'argv', ['gitdata', 'ls', 'mysql://myserver']):
+            with patch(
+                    'gitdata.connectors.tabular.pymysql.connect',
+                    side_effect=connection_error):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            'gitdata: could not connect to MySQL server at myserver:3306. '
+            'Check the server name, confirm MySQL is running, and verify '
+            'network access.\n',
+        )
+
+    def test_mysql_unknown_server_escapes_host_name(self):
+        error = StringIO()
+        connection_error = pymysql.err.OperationalError(2003, 'unreachable')
+
+        with patch.object(
+                sys, 'argv', ['gitdata', 'ls', 'mysql://\x1bredhost']):
+            with patch(
+                    'gitdata.connectors.tabular.pymysql.connect',
+                    side_effect=connection_error):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit):
+                        main()
+
+        self.assertIn('MySQL server at \\x1bredhost:3306', error.getvalue())
+        self.assertNotIn('\x1b', error.getvalue())
+
+    def test_mysql_authentication_failure_exits_with_helpful_message(self):
+        error = StringIO()
+        connection_error = pymysql.err.OperationalError(
+            1045,
+            "Access denied for user 'root'@'client' (using password: YES)",
+        )
+
+        with patch.object(
+                sys, 'argv', ['gitdata', 'ls', 'mysql://root@db.example']):
+            with patch(
+                    'gitdata.connectors.tabular.pymysql.connect',
+                    side_effect=connection_error):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: could not authenticate MySQL user 'root' at "
+            'db.example:3306. Check the user name and password.\n',
+        )
+        self.assertNotIn('using password', error.getvalue())
+
+    def test_mysql_authentication_failure_escapes_user_name(self):
+        error = StringIO()
+        connection_error = pymysql.err.OperationalError(1045, 'access denied')
+
+        with patch.object(
+                sys, 'argv',
+                ['gitdata', 'ls', 'mysql://bad%1b%5b31m@db.example']):
+            with patch(
+                    'gitdata.connectors.tabular.pymysql.connect',
+                    side_effect=connection_error):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit):
+                        main()
+
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: could not authenticate MySQL user 'bad\\x1b[31m' at "
+            'db.example:3306. Check the user name and password.\n',
+        )
+        self.assertNotIn('\x1b', error.getvalue())
+
+    def test_mysql_unknown_database_exits_with_helpful_message(self):
+        error = StringIO()
+        connection_error = pymysql.err.OperationalError(
+            1049, "Unknown database 'missing'"
+        )
+
+        with patch.object(
+                sys, 'argv',
+                ['gitdata', 'ls', 'mysql://root@db.example/missing']):
+            with patch(
+                    'gitdata.connectors.tabular.pymysql.connect',
+                    side_effect=connection_error):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: MySQL database 'missing' was not found at "
+            'db.example:3306. Check the database name.\n',
+        )
+
+    def test_mysql_other_connection_failure_hides_driver_details(self):
+        error = StringIO()
+        connection_error = pymysql.err.OperationalError(
+            9999, 'driver detail that should not reach the terminal'
+        )
+
+        with patch.object(
+                sys, 'argv', ['gitdata', 'ls', 'mysql://db.example']):
+            with patch(
+                    'gitdata.connectors.tabular.pymysql.connect',
+                    side_effect=connection_error):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            'gitdata: MySQL could not open a connection to db.example:3306 '
+            '(error 9999). Check the server settings and access permissions.\n',
+        )
+        self.assertNotIn('driver detail', error.getvalue())
+
     def test_ctrl_c_exits_cleanly_without_a_traceback(self):
         error = StringIO()
         with patch.object(sys, 'argv', ['gitdata', 'scan', 'slow.csv']):
