@@ -20,8 +20,8 @@ python3 -m pip install 'gitdata-lib[oracle]'
 
 ## Explore a data source
 
-The same two commands work across CSV files, SQLite databases, and
-MariaDB/MySQL databases:
+The same two commands work across CSV files, SQLite databases,
+MariaDB/MySQL databases, and Oracle databases:
 
 ```bash
 gitdata ls <source>
@@ -159,9 +159,50 @@ gitdata ls --help
 gitdata scan --help
 ```
 
-## Oracle from Python
+## Oracle
 
-Use the optional Oracle driver through the Python API:
+Install the optional Oracle driver, then keep the password in an environment
+variable:
+
+```bash
+python3 -m pip install 'gitdata-lib[oracle]'
+export ORACLE_PASSWORD='your-password'
+
+DATABASE='oracle://app@db.example.com:1521/FREEPDB1?password_env=ORACLE_PASSWORD'
+TABLE="${DATABASE}#orders"
+```
+
+Explore the service and its tables with the same commands:
+
+```bash
+# List tables owned by the connected user
+gitdata ls "$DATABASE"
+
+# Show table counts and sizes
+gitdata ls -l "$DATABASE"
+
+# Show column details
+gitdata ls -l "$TABLE"
+
+# Preview rows
+gitdata scan --limit 10 "$TABLE"
+```
+
+Oracle references follow this shape:
+
+```text
+oracle://user@host:port/service?password_env=ENVIRONMENT_VARIABLE
+oracle://user@host:port/service?password_env=ENVIRONMENT_VARIABLE#table
+```
+
+Inline passwords are not accepted. Ordinary Oracle table and column names are
+shown in lowercase. Quoted identifiers are shown with their double quotes so
+names that differ only by Oracle quoting remain distinct; use the displayed
+spelling after `#` when selecting one (the quotes may be URL-encoded as `%22`).
+
+### Oracle from Python
+
+The existing Python API remains available:
 
 ```python
 import os

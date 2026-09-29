@@ -31,6 +31,55 @@ from gitdata.utils import trim
 root_logger = logging.getLogger()
 
 
+def _redact_inline_url_password(value):
+    scheme_end = value.find('://')
+    if scheme_end < 1:
+        return value
+    authority_start = scheme_end + 3
+    separators = [
+        position for position in (
+            value.find('/', authority_start),
+            value.find('?', authority_start),
+            value.find('#', authority_start),
+        )
+        if position >= 0
+    ]
+    authority_end = min(separators) if separators else len(value)
+    authority = value[authority_start:authority_end]
+    at = authority.rfind('@')
+    colon = authority.find(':')
+    if at < 0 or colon < 0 or colon > at:
+        return value
+    redacted = authority[:colon + 1] + '***' + authority[at:]
+    return value[:authority_start] + redacted + value[authority_end:]
+
+
+def _redact_debug_value(value):
+    """Remove URL passwords before rendering parsed debug arguments."""
+    if isinstance(value, str):
+        return _redact_inline_url_password(value)
+    if isinstance(value, list):
+        return [_redact_debug_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_redact_debug_value(item) for item in value)
+    if isinstance(value, dict):
+        return {
+            key: _redact_debug_value(item)
+            for key, item in value.items()
+        }
+    return value
+
+
+def terminal_text(value):
+    """Render text without terminal control characters."""
+    return ''.join(
+        character
+        if character.isprintable()
+        else character.encode('unicode_escape').decode('ascii')
+        for character in str(value)
+    )
+
+
 def print_help(doc):
     """Print help text"""
     print(trim(doc))
@@ -73,7 +122,7 @@ def _main():
     )
 
     if args['--debug']:
-        print(args)
+        print(_redact_debug_value(args))
         root_logger.setLevel(logging.DEBUG)
 
     argv = [args['<command>']] + args['<args>']

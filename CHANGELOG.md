@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- add direct `gitdata ls` and `gitdata scan` support for Oracle services and tables
+- show actionable CLI errors for Oracle connection, authentication, service, table, and query failures
+- redact inline URL passwords from debug output and escape terminal control characters in CLI listings
 - show actionable CLI errors for MariaDB/MySQL connection, authentication, and database-selection failures instead of tracebacks
 
 ## [v0.0.18] - 2026-09-28
