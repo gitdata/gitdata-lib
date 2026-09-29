@@ -409,7 +409,7 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertIn("'unknown'", output)
         metadata_query = cursor.execute.call_args.args[0]
         self.assertIn('from user_tab_cols c', metadata_query)
-        self.assertIn("c.hidden_column = 'NO'", metadata_query)
+        self.assertIn("c.user_generated = 'YES'", metadata_query)
 
     def test_ls_long_lists_oracle_table_metadata(self):
         driver = types.ModuleType('oracledb')
