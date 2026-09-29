@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 
 import pymysql
 
-from gitdata.connectors.common import BaseConnector
+from gitdata.connectors.common import BaseConnector, ConnectorError
 
 
 class CsvConnector(BaseConnector):
@@ -152,7 +152,41 @@ class MariaDBConnector(BaseConnector):
 
     @staticmethod
     def _connect(config):
-        database = pymysql.connect(**config)
+        try:
+            database = pymysql.connect(**config)
+        except pymysql.OperationalError as error:
+            code = error.args[0] if error.args else None
+            host = config['host'].encode('unicode_escape').decode('ascii')
+            address = '{}:{}'.format(host, config['port'])
+            if code == 2003:
+                message = (
+                    'could not connect to MySQL server at {}. '
+                    'Check the server name, confirm MySQL is running, and '
+                    'verify network access.'.format(address)
+                )
+            elif code == 1045:
+                message = (
+                    'could not authenticate MySQL user {!r} at {}. '
+                    'Check the user name and password.'.format(
+                        config['user'], address
+                    )
+                )
+            elif code == 1049:
+                message = (
+                    'MySQL database {!r} was not found at {}. '
+                    'Check the database name.'.format(
+                        config['database'], address
+                    )
+                )
+            else:
+                code = code if isinstance(code, int) else 'unknown'
+                message = (
+                    'MySQL could not open a connection to {} (error {}). '
+                    'Check the server settings and access permissions.'.format(
+                        address, code
+                    )
+                )
+            raise ConnectorError(message) from None
         try:
             with database.cursor() as cursor:
                 cursor.execute('set session transaction read only')
