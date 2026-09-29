@@ -251,7 +251,8 @@ class OracleConnector(BaseConnector):
                         'c.table_name and kc.column_name = c.column_name) '
                         "then 'PRI' else '-' end, c.data_precision, "
                         'c.data_scale, c.char_length, c.char_used '
-                        'from user_tab_columns c where '
+                        'from user_tab_cols c where '
+                        "c.hidden_column = 'NO' and "
                         'c.table_name = :table_name order by c.column_id'
                     )
                     candidates = (
