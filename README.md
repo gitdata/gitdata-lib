@@ -199,24 +199,3 @@ Inline passwords are not accepted. Ordinary Oracle table and column names are
 shown in lowercase. Quoted identifiers are shown with their double quotes so
 names that differ only by Oracle quoting remain distinct; use the displayed
 spelling after `#` when selecting one (the quotes may be URL-encoded as `%22`).
-
-### Oracle from Python
-
-The existing Python API remains available:
-
-```python
-import os
-
-from gitdata.database import connect
-
-db = connect(
-    'oracle',
-    host='127.0.0.1',
-    port=1521,
-    service_name='FREEPDB1',
-    user='app',
-    password=os.environ['ORACLE_PASSWORD'],
-)
-
-rows = list(db('SELECT 1 FROM dual'))
-```
