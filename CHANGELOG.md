@@ -5,7 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-- select Oracle tables with `/table` paths and read passwords from `PASSWORD` or the variable named by `GITDATA_PASSWORD_ENV`
+- read Oracle and MariaDB/MySQL passwords from `PASSWORD` or the variable named by `GITDATA_PASSWORD_ENV`, without URL query or fragment syntax
+- select Oracle tables with `/table` paths and try the username as the service when `/service` is omitted
 
 ## [v0.0.19] - 2026-09-28
 - add direct `gitdata ls` and `gitdata scan` support for Oracle services and tables

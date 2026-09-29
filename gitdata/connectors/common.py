@@ -8,6 +8,7 @@ import inspect
 import importlib
 import io
 import logging
+import os
 import pkgutil
 import platform
 
@@ -104,6 +105,23 @@ class ConnectorError(Exception):
 
 class UnsupportedRef(ValueError):
     """Raised when no Connector can resolve a ref."""
+
+
+def password_from_environment(database, error_type=ValueError):
+    """Read a database password through the configured environment variable."""
+    variable = os.environ.get('GITDATA_PASSWORD_ENV', 'PASSWORD')
+    if not variable:
+        raise error_type(
+            'GITDATA_PASSWORD_ENV must name an environment variable'
+        )
+    try:
+        return os.environ[variable]
+    except KeyError:
+        raise error_type(
+            '{} password environment variable {!r} is not set'.format(
+                database, variable
+            )
+        ) from None
 
 
 class Blob(io.BytesIO):

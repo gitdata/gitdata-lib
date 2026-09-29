@@ -52,11 +52,9 @@ class OracleConnectorTests(unittest.TestCase):
     def test_ref_resolves_connection_settings_and_selected_table(self):
         connector = OracleConnector()
 
-        with patch.dict(os.environ, {'ORACLE_PASSWORD': 'secret'}):
-            config, table = connector._parts(
-                'oracle://app@db.example:1522/FREEPDB1'
-                '?password_env=ORACLE_PASSWORD#Customers'
-            )
+        config, table = connector._parts(
+            'oracle://app@db.example:1522/FREEPDB1/Customers'
+        )
 
         self.assertEqual(
             config,
@@ -69,6 +67,16 @@ class OracleConnectorTests(unittest.TestCase):
             },
         )
         self.assertEqual(table, 'Customers')
+
+    def test_ref_infers_service_name_from_user_when_omitted(self):
+        config, table = OracleConnector()._parts(
+            'oracle://gitdata_test@db.example'
+        )
+
+        self.assertEqual(config['service_name'], 'gitdata_test')
+        self.assertEqual(config['user'], 'gitdata_test')
+        self.assertTrue(config['_service_inferred'])
+        self.assertIsNone(table)
 
     def test_ref_uses_path_table_default_port_and_password_variable(self):
         config, table = OracleConnector()._parts(
@@ -167,17 +175,16 @@ class OracleConnectorTests(unittest.TestCase):
                 self.assertNotIn(password, combined)
                 self.assertIn('app:***@db.example', combined)
 
-    def test_ref_requires_user_host_and_service(self):
+    def test_ref_requires_user_and_host(self):
         refs = (
             'oracle://db.example/FREEPDB1',
             'oracle://app@/FREEPDB1',
-            'oracle://app@db.example',
         )
         for ref in refs:
             with self.subTest(ref=ref):
                 with self.assertRaisesRegex(
                         ValueError,
-                        'Oracle refs require a user, host, and service name'):
+                        'Oracle refs require a user and host'):
                     OracleConnector()._parts(ref)
 
     def test_malformed_oracle_ref_exits_without_a_traceback(self):
@@ -192,14 +199,20 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 1)
         self.assertEqual(error.getvalue(), 'gitdata: Oracle ref is malformed\n')
 
-    def test_ref_rejects_unsupported_options(self):
-        with self.assertRaisesRegex(
-                ValueError, 'Unsupported Oracle ref option'):
-            OracleConnector()._parts(
-                'oracle://app@db.example/FREEPDB1?wallet=example'
-            )
+    def test_ref_rejects_query_parameters(self):
+        refs = (
+            'oracle://app@db.example/FREEPDB1?',
+            'oracle://app@db.example/FREEPDB1?wallet=example',
+            'oracle://app@db.example/FREEPDB1?password_env=MISSING',
+        )
+        for ref in refs:
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(
+                        ValueError,
+                        'Oracle refs do not accept query parameters'):
+                    OracleConnector()._parts(ref)
 
-    def test_unsupported_option_escapes_terminal_control_characters(self):
+    def test_query_error_does_not_render_terminal_control_characters(self):
         error = StringIO()
         ref = 'oracle://app@db.example/FREEPDB1?%1B%5B31mwallet=example'
 
@@ -210,27 +223,21 @@ class OracleConnectorTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, 1)
         self.assertNotIn('\x1b', error.getvalue())
-        self.assertIn(r'\x1b[31mwallet', error.getvalue())
+        self.assertEqual(
+            error.getvalue(),
+            'gitdata: Oracle refs do not accept query parameters\n',
+        )
 
-    def test_ref_reports_a_missing_password_environment_variable(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaisesRegex(
-                    ValueError,
-                    "Oracle password environment variable 'MISSING' is not set"):
-                OracleConnector()._parts(
-                    'oracle://app@db.example/FREEPDB1?password_env=MISSING'
-                )
-
-    def test_ref_rejects_empty_or_duplicate_password_environment_options(self):
+    def test_ref_rejects_fragment_table_selection(self):
         refs = (
-            'oracle://app@db.example/FREEPDB1?password_env=',
-            'oracle://app@db.example/FREEPDB1?password_env=FIRST&password_env=SECOND',
+            'oracle://app@db.example/FREEPDB1#',
+            'oracle://app@db.example/FREEPDB1#customers',
         )
         for ref in refs:
             with self.subTest(ref=ref):
                 with self.assertRaisesRegex(
                         ValueError,
-                        'password_env must name exactly one environment variable'):
+                        'Oracle refs do not accept fragment selectors'):
                     OracleConnector()._parts(ref)
 
     def test_ls_lists_oracle_tables_and_closes_connection(self):
@@ -416,6 +423,36 @@ class OracleConnectorTests(unittest.TestCase):
             "gitdata: Oracle service 'MISSING' was not found at "
             'db.example:1521. Check the service name and listener '
             'registration.\n',
+        )
+
+    def test_failed_inferred_service_requests_an_explicit_service(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        detail = SimpleNamespace(
+            full_code='DPY-6005',
+            message=(
+                'DPY-6005: cannot connect to database. '
+                'DPY-6001: Service is not registered with the listener.'
+            ),
+        )
+        driver.connect = Mock(side_effect=driver.Error(detail))
+
+        error = StringIO()
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls', 'oracle://gitdata_test@db.example']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: Oracle service 'gitdata_test', inferred from user "
+            "'gitdata_test', was not found at db.example:1521. Add an "
+            'explicit service name to the ref.\n',
         )
 
     def test_ls_lists_columns_for_a_selected_oracle_table(self):
