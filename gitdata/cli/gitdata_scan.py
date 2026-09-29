@@ -12,6 +12,7 @@ from decimal import Decimal
 import shutil
 import sys
 
+from gitdata.cli import terminal_text
 from gitdata.connectors import fetch
 from gitdata.inspection import scan
 
@@ -31,7 +32,12 @@ def _title(report):
     )
     row_label = 'row' if row_label_count == 1 else 'rows'
     return '{}: {:,} {}, {} {}{}'.format(
-        report['name'], columns, column_label, rows, row_label, sampled
+        terminal_text(report['name']),
+        columns,
+        column_label,
+        rows,
+        row_label,
+        sampled,
     )
 
 
@@ -48,6 +54,7 @@ def _format_value(value):
         text = '{:%Y-%m-%d}'.format(value)
     else:
         text = str(value)
+    text = terminal_text(text)
     if len(text) > 12:
         return text[:12] + '...'
     return text
@@ -81,7 +88,7 @@ def _column_widths():
 
 
 def _cell(value, width, right=False):
-    text = str(value)
+    text = terminal_text(value)
     if len(text) > width:
         half = round(width / 2)
         text = (text[:half - 2] + ' ... ' + text[-half + 3:])[:width]

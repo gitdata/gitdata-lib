@@ -7,6 +7,7 @@ options:
     -h, --help      show help
 """
 
+from gitdata.cli import terminal_text
 from gitdata.connectors import fetch
 from gitdata.inspection import list_items
 
@@ -35,7 +36,7 @@ def _display(value):
         return '-'
     if isinstance(value, int):
         return '{:,}'.format(value)
-    return str(value)
+    return terminal_text(value)
 
 
 def _row(values, widths):
@@ -81,4 +82,4 @@ def ls_to_console(args):
         _print_verbose(root, items)
         return
     for item in items:
-        print(item['name'])
+        print(terminal_text(item['name']))
