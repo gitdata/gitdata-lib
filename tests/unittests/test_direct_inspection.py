@@ -28,6 +28,12 @@ class DirectInspectionTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
+        password = patch.dict(
+            os.environ,
+            {'GITDATA_PASSWORD_ENV': 'PASSWORD', 'PASSWORD': 'secret'},
+        )
+        password.start()
+        self.addCleanup(password.stop)
 
     def write_csv(self, name, text):
         pathname = os.path.join(self.tempdir.name, name)
@@ -333,7 +339,7 @@ class DirectInspectionTests(unittest.TestCase):
             host='127.0.0.1',
             port=3306,
             user='root',
-            password=None,
+            password='secret',
             charset='utf8mb4',
             autocommit=True,
         )
@@ -397,7 +403,7 @@ class DirectInspectionTests(unittest.TestCase):
         stats_sql = stats_cursor.execute.call_args[0][0].lower()
         self.assertNotIn('s.schema_name not in', stats_sql)
 
-    def test_mysql_server_ref_defaults_to_current_os_user_without_password(self):
+    def test_mysql_server_ref_defaults_to_current_os_user(self):
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.__iter__.return_value = iter([])
@@ -414,7 +420,7 @@ class DirectInspectionTests(unittest.TestCase):
             host='zeno',
             port=3306,
             user='lab-user',
-            password=None,
+            password='secret',
             charset='utf8mb4',
             autocommit=True,
         )
@@ -510,21 +516,18 @@ class DirectInspectionTests(unittest.TestCase):
         self.assertEqual(config['database'], 'cocal')
         self.assertEqual(table, 'cal_event')
 
-    def test_mysql_ref_keeps_fragment_table_selection_compatible(self):
-        config, table = MariaDBConnector()._parts(
-            'mysql://localhost/cocal#cal_event'
+    def test_mysql_ref_rejects_fragment_table_selection(self):
+        refs = (
+            'mysql://localhost/cocal#',
+            'mysql://localhost/cocal#cal_event',
+            'mysql://localhost/archive.2026#cal_event',
         )
-
-        self.assertEqual(config['database'], 'cocal')
-        self.assertEqual(table, 'cal_event')
-
-    def test_mysql_fragment_disambiguates_dotted_database_name(self):
-        config, table = MariaDBConnector()._parts(
-            'mysql://localhost/archive.2026#cal_event'
-        )
-
-        self.assertEqual(config['database'], 'archive.2026')
-        self.assertEqual(table, 'cal_event')
+        for ref in refs:
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(
+                        ValueError,
+                        'MariaDB refs do not accept fragment selectors'):
+                    MariaDBConnector()._parts(ref)
 
     def test_mysql_ref_preserves_encoded_dot_in_database_name(self):
         config, table = MariaDBConnector()._parts(
@@ -540,11 +543,43 @@ class DirectInspectionTests(unittest.TestCase):
                 'mysql://localhost/cocal.cal_event/extra'
             )
 
+    def test_mysql_ref_rejects_query_parameters(self):
+        refs = (
+            'mysql://localhost/cocal?',
+            'mysql://localhost/cocal?password_env=MYSQL_PASSWORD',
+        )
+        for ref in refs:
+            with self.subTest(ref=ref):
+                with self.assertRaisesRegex(
+                        ValueError,
+                        'MariaDB refs do not accept query parameters'):
+                    MariaDBConnector()._parts(ref)
+
+    def test_mysql_ref_uses_password_named_by_gitdata_password_env(self):
+        environment = {
+            'GITDATA_PASSWORD_ENV': 'MYSQL_PASSWORD',
+            'MYSQL_PASSWORD': 'custom-secret',
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            config, _ = MariaDBConnector()._parts(
+                'mysql://root@localhost/cocal'
+            )
+
+        self.assertEqual(config['password'], 'custom-secret')
+
+    def test_mysql_ref_reports_missing_default_password_variable(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(
+                    ValueError,
+                    "MariaDB password environment variable 'PASSWORD' is not set"):
+                MariaDBConnector()._parts('mysql://root@localhost/cocal')
+
     def test_mariadb_inline_passwords_are_rejected_without_echoing_them(self):
         password = '-'.join(('not', 'for', 'logs'))
         ref = 'mysql://root:{}@127.0.0.1/gitdata_example'.format(password)
 
-        with self.assertRaisesRegex(ValueError, 'password_env') as raised:
+        with self.assertRaisesRegex(
+                ValueError, 'GITDATA_PASSWORD_ENV') as raised:
             MariaDBConnector()._parts(ref)
 
         self.assertNotIn(password, str(raised.exception))
@@ -1074,6 +1109,11 @@ class MySQLDirectInspectionTests(unittest.TestCase):
     def setUp(self):
         password_name = 'GITDATA_TEST_MYSQL_INSPECTION_PASSWORD'
         self.password = os.environ[password_name]
+        password_env = patch.dict(
+            os.environ, {'GITDATA_PASSWORD_ENV': password_name}
+        )
+        password_env.start()
+        self.addCleanup(password_env.stop)
         user = os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_USER', 'root')
         host = os.environ['GITDATA_TEST_MYSQL_INSPECTION_HOST']
         port = os.environ.get('GITDATA_TEST_MYSQL_INSPECTION_PORT', '3306')
@@ -1081,25 +1121,22 @@ class MySQLDirectInspectionTests(unittest.TestCase):
             'GITDATA_TEST_MYSQL_INSPECTION_DATABASE',
             'gitdata_example',
         )
-        self.server_ref = 'mysql://{}@{}:{}?password_env={}'.format(
+        self.server_ref = 'mysql://{}@{}:{}'.format(
             user,
             host,
             port,
-            password_name,
         )
-        self.ref = 'mysql://{}@{}:{}/{}?password_env={}'.format(
+        self.ref = 'mysql://{}@{}:{}/{}'.format(
             user,
             host,
             port,
             self.database,
-            password_name,
         )
-        self.table_ref = 'mysql://{}@{}:{}/{}.customers?password_env={}'.format(
+        self.table_ref = 'mysql://{}@{}:{}/{}.customers'.format(
             user,
             host,
             port,
             self.database,
-            password_name,
         )
 
     def test_mariadb_server_ref_lists_visible_databases(self):

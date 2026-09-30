@@ -1,11 +1,14 @@
 """Oracle connector for direct CLI inspection."""
 
 from contextlib import contextmanager
-import os
 import sys
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import unquote, urlsplit
 
-from gitdata.connectors.common import BaseConnector, ConnectorError
+from gitdata.connectors.common import (
+    BaseConnector,
+    ConnectorError,
+    password_from_environment,
+)
 
 
 class OracleRefError(ConnectorError, ValueError):
@@ -48,26 +51,34 @@ class OracleConnector(BaseConnector):
             parts = urlsplit(ref)
         except ValueError:
             raise OracleRefError('Oracle ref is malformed') from None
-        query = parse_qs(parts.query, keep_blank_values=True)
-        unexpected = set(query) - {'password_env'}
-        if unexpected:
+        if '?' in ref:
             raise OracleRefError(
-                'Unsupported Oracle ref option(s): {}'.format(
-                    ', '.join(
-                        self._safe_component(option)
-                        for option in sorted(unexpected)
-                    )
-                )
+                'Oracle refs do not accept query parameters'
             )
-        raw_service_name = parts.path.lstrip('/')
-        service_name = unquote(raw_service_name)
-        if (
-                not parts.username
-                or not parts.hostname
-                or not service_name
-                or '/' in service_name):
+        if '#' in ref:
             raise OracleRefError(
-                'Oracle refs require a user, host, and service name'
+                'Oracle refs do not accept fragment selectors; use /table'
+            )
+        if not parts.username or not parts.hostname:
+            raise OracleRefError('Oracle refs require a user and host')
+
+        user = unquote(parts.username)
+        raw_path = parts.path.lstrip('/')
+        raw_components = raw_path.split('/') if raw_path else []
+        if len(raw_components) > 2 or not all(raw_components):
+            raise OracleRefError(
+                'Oracle refs accept a service and optional table path'
+            )
+        service_inferred = not raw_components
+        service_name = (
+            user if service_inferred else unquote(raw_components[0])
+        )
+        table = (
+            unquote(raw_components[1]) if len(raw_components) == 2 else None
+        )
+        if '/' in service_name:
+            raise OracleRefError(
+                'Oracle service names containing slashes must be URL-encoded'
             )
         try:
             port = parts.port or 1521
@@ -75,32 +86,19 @@ class OracleConnector(BaseConnector):
             raise OracleRefError('Oracle refs require a valid port') from None
         if parts.password is not None:
             raise OracleRefError(
-                'Inline Oracle passwords are not supported; use password_env'
+                'Inline Oracle passwords are not supported; set PASSWORD or '
+                'name another variable with GITDATA_PASSWORD_ENV'
             )
-        password = None
-        password_env = query.get('password_env', ())
-        if password_env and (
-                len(password_env) != 1 or not password_env[0]):
-            raise OracleRefError(
-                'password_env must name exactly one environment variable'
-            )
-        if password_env:
-            variable = password_env[0]
-            try:
-                password = os.environ[variable]
-            except KeyError:
-                raise OracleRefError(
-                    'Oracle password environment variable {!r} is not set'
-                    .format(variable)
-                )
+        password = password_from_environment('Oracle', OracleRefError)
         config = {
             'host': parts.hostname,
             'port': port,
             'service_name': service_name,
-            'user': unquote(parts.username),
+            'user': user,
             'password': password,
         }
-        table = unquote(parts.fragment) if parts.fragment else None
+        if service_inferred:
+            config['_service_inferred'] = True
         return config, table
 
     @staticmethod
@@ -121,6 +119,14 @@ class OracleConnector(BaseConnector):
     def _connection_error(cls, config, error):
         detail = error.args[0] if error.args else None
         full_code = cls._error_code(detail)
+        detail_message = getattr(detail, 'message', '')
+        service_error = (
+            full_code in ('ORA-12514', 'DPY-6001')
+            or (
+                isinstance(detail_message, str)
+                and 'DPY-6001:' in detail_message
+            )
+        )
         host = cls._safe_component(config['host'])
         service = cls._safe_component(config['service_name'])
         server = '{}:{}'.format(host, config['port'])
@@ -129,7 +135,7 @@ class OracleConnector(BaseConnector):
             'DPY-6000', 'DPY-6005', 'ORA-12170', 'ORA-12541',
             'ORA-12543', 'ORA-12545',
         )
-        if full_code in network_errors:
+        if full_code in network_errors and not service_error:
             message = (
                 'could not connect to Oracle at {}. Check the server name, '
                 'confirm the Oracle listener is running, and verify network '
@@ -148,15 +154,25 @@ class OracleConnector(BaseConnector):
         elif full_code == 'DPY-4001':
             message = (
                 'Oracle credentials were not provided for user {!r}. Set '
-                'password_env in the Oracle ref.'.format(config['user'])
+                'PASSWORD or name another variable with '
+                'GITDATA_PASSWORD_ENV.'.format(config['user'])
             )
-        elif full_code in ('ORA-12514', 'DPY-6001'):
-            message = (
-                'Oracle service {!r} was not found at {}. Check the service '
-                'name and listener registration.'.format(
-                    config['service_name'], server
+        elif service_error:
+            if config.get('_service_inferred'):
+                message = (
+                    'Oracle service {!r}, inferred from user {!r}, was not '
+                    'found at {}. Add an explicit service name to the ref.'
+                    .format(
+                        config['service_name'], config['user'], server
+                    )
                 )
-            )
+            else:
+                message = (
+                    'Oracle service {!r} was not found at {}. Check the service '
+                    'name and listener registration.'.format(
+                        config['service_name'], server
+                    )
+                )
         else:
             code = cls._safe_component(full_code or 'unknown')
             message = (

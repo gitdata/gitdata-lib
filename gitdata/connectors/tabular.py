@@ -6,11 +6,15 @@ import getpass
 import os
 from pathlib import Path
 import sqlite3
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import unquote, urlsplit
 
 import pymysql
 
-from gitdata.connectors.common import BaseConnector, ConnectorError
+from gitdata.connectors.common import (
+    BaseConnector,
+    ConnectorError,
+    password_from_environment,
+)
 
 
 class CsvConnector(BaseConnector):
@@ -75,13 +79,12 @@ class MariaDBConnector(BaseConnector):
 
     def _parts(self, ref):
         parts = urlsplit(ref)
-        query = parse_qs(parts.query, keep_blank_values=True)
-        unexpected = set(query) - {'password_env'}
-        if unexpected:
+        if '?' in ref:
+            raise ValueError('MariaDB refs do not accept query parameters')
+        if '#' in ref:
             raise ValueError(
-                'Unsupported MariaDB ref option(s): {}'.format(
-                    ', '.join(sorted(unexpected))
-                )
+                'MariaDB refs do not accept fragment selectors; use '
+                'database.table'
             )
 
         raw_database = parts.path.lstrip('/')
@@ -89,11 +92,8 @@ class MariaDBConnector(BaseConnector):
             raise ValueError(
                 'MariaDB refs accept only one database and table selection'
             )
-        fragment_table = unquote(parts.fragment) if parts.fragment else None
         dotted_table = None
-        if fragment_table:
-            database = unquote(raw_database)
-        elif '.' in raw_database:
+        if '.' in raw_database:
             if raw_database.count('.') != 1:
                 raise ValueError(
                     'MariaDB refs accept one database.table selection'
@@ -107,7 +107,7 @@ class MariaDBConnector(BaseConnector):
             dotted_table = unquote(raw_table)
         else:
             database = unquote(raw_database)
-        table = dotted_table or fragment_table
+        table = dotted_table
 
         if not parts.hostname or '/' in database or (table and '/' in table):
             raise ValueError(
@@ -120,19 +120,10 @@ class MariaDBConnector(BaseConnector):
 
         if parts.password is not None:
             raise ValueError(
-                'Inline MariaDB passwords are not supported; use password_env'
+                'Inline MariaDB passwords are not supported; set PASSWORD or '
+                'name another variable with GITDATA_PASSWORD_ENV'
             )
-        if query.get('password_env'):
-            variable = query['password_env'][-1]
-            try:
-                password = os.environ[variable]
-            except KeyError:
-                raise ValueError(
-                    'MariaDB password environment variable {!r} is not set'
-                    .format(variable)
-                )
-        else:
-            password = None
+        password = password_from_environment('MariaDB')
 
         config = {
             'host': parts.hostname,

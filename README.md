@@ -74,14 +74,14 @@ path/to/database.sqlite/table.column
 ## MariaDB and MySQL
 
 Keep passwords in environment variables instead of putting them in database
-references:
+references. GitData reads `PASSWORD` by default:
 
 ```bash
-export GITDATA_DB_PASSWORD='your-password'
+export PASSWORD='your-password'
 
-SERVER='mysql://user@db.example.com?password_env=GITDATA_DB_PASSWORD'
-DATABASE='mysql://user@db.example.com/sales?password_env=GITDATA_DB_PASSWORD'
-TABLE='mysql://user@db.example.com/sales.orders?password_env=GITDATA_DB_PASSWORD'
+SERVER='mysql://user@db.example.com'
+DATABASE='mysql://user@db.example.com/sales'
+TABLE='mysql://user@db.example.com/sales.orders'
 ```
 
 Explore the server, database, and table with the same commands:
@@ -109,6 +109,15 @@ mysql://user@host/database.table
 ```
 
 If the username is omitted, GitData uses the current operating-system username.
+Inline passwords, query parameters, and fragment selectors are not accepted.
+To use a password variable other than `PASSWORD`, set `GITDATA_PASSWORD_ENV`
+to its name:
+
+```bash
+export GITDATA_PASSWORD_ENV=MYSQL_PASSWORD
+export MYSQL_PASSWORD='your-password'
+```
+
 Use `gitdata ls -a` when you also want to see system databases or tables.
 
 ### Try the included MariaDB example
@@ -131,9 +140,10 @@ done
 docker exec -i gitdata-example-mariadb \
   mariadb -uroot -pexample < examples/mariadb.sql
 
+export GITDATA_PASSWORD_ENV=GITDATA_EXAMPLE_PASSWORD
 export GITDATA_EXAMPLE_PASSWORD=example
-gitdata ls 'mysql://root@127.0.0.1:3307/gitdata_example?password_env=GITDATA_EXAMPLE_PASSWORD'
-gitdata scan --limit 5 'mysql://root@127.0.0.1:3307/gitdata_example.customers?password_env=GITDATA_EXAMPLE_PASSWORD'
+gitdata ls 'mysql://root@127.0.0.1:3307/gitdata_example'
+gitdata scan --limit 5 'mysql://root@127.0.0.1:3307/gitdata_example.customers'
 ```
 
 Remove the example when finished:
@@ -161,15 +171,15 @@ gitdata scan --help
 
 ## Oracle
 
-Install the optional Oracle driver, then keep the password in an environment
-variable:
+Install the optional Oracle driver, then set the password. GitData reads
+`PASSWORD` by default:
 
 ```bash
 python3 -m pip install 'gitdata-lib[oracle]'
-export ORACLE_PASSWORD='your-password'
+export PASSWORD='your-password'
 
-DATABASE='oracle://app@db.example.com:1521/FREEPDB1?password_env=ORACLE_PASSWORD'
-TABLE="${DATABASE}#orders"
+DATABASE='oracle://app@db.example.com/FREEPDB1'
+TABLE="${DATABASE}/orders"
 ```
 
 Explore the service and its tables with the same commands:
@@ -188,14 +198,28 @@ gitdata ls -l "$TABLE"
 gitdata scan --limit 10 "$TABLE"
 ```
 
-Oracle references follow this shape:
+Oracle references follow these shapes; port `1521` may be omitted:
 
 ```text
-oracle://user@host:port/service?password_env=ENVIRONMENT_VARIABLE
-oracle://user@host:port/service?password_env=ENVIRONMENT_VARIABLE#table
+oracle://user@host
+oracle://user@host:port/service
+oracle://user@host:port/service/table
 ```
 
-Inline passwords are not accepted. Ordinary Oracle table and column names are
-shown in lowercase. Quoted identifiers are shown with their double quotes so
-names that differ only by Oracle quoting remain distinct; use the displayed
-spelling after `#` when selecting one (the quotes may be URL-encoded as `%22`).
+When the service is omitted, GitData first tries the username as the service
+name. If Oracle does not advertise that service, GitData asks for an explicit
+`/service` path.
+
+To use a password variable other than `PASSWORD`, set
+`GITDATA_PASSWORD_ENV` to its name:
+
+```bash
+export GITDATA_PASSWORD_ENV=ORACLE_PASSWORD
+export ORACLE_PASSWORD='your-password'
+```
+
+Inline passwords, query parameters, and fragment selectors are not accepted.
+Ordinary Oracle table and column names are shown in lowercase. Quoted identifiers
+are shown with their double quotes so names that differ only by Oracle quoting
+remain distinct; use the displayed spelling as the final path component when
+selecting one (the quotes may be URL-encoded as `%22`).

@@ -44,6 +44,12 @@ class TestOracleDatabase(unittest.TestCase):
         return output.getvalue(), error.getvalue()
 
     def setUp(self):
+        password_env = patch.dict(
+            os.environ,
+            {'GITDATA_PASSWORD_ENV': 'GITDATA_TEST_ORACLE_PASSWORD'},
+        )
+        password_env.start()
+        self.addCleanup(password_env.stop)
         get = os.environ.get
         self.db = connect(
             'oracle',
@@ -58,15 +64,14 @@ class TestOracleDatabase(unittest.TestCase):
 
     def _ref(self, table=None):
         get = os.environ.get
-        ref = 'oracle://{}@{}:{}/{}?password_env={}'.format(
+        ref = 'oracle://{}@{}:{}/{}'.format(
             quote(os.environ['GITDATA_TEST_ORACLE_USER'], safe=''),
             get('GITDATA_TEST_ORACLE_HOST', '127.0.0.1'),
             int(get('GITDATA_TEST_ORACLE_PORT', '1521')),
             quote(os.environ['GITDATA_TEST_ORACLE_SERVICE_NAME'], safe=''),
-            'GITDATA_TEST_ORACLE_PASSWORD',
         )
         if table is not None:
-            ref += '#' + quote(table, safe='')
+            ref += '/' + quote(table, safe='')
         return ref
 
     def tearDown(self):
