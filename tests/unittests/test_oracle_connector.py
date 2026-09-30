@@ -49,6 +49,11 @@ class OracleConnectorTests(unittest.TestCase):
 
         self.assertIn('OracleConnector', connector_names)
 
+    def test_connector_accepts_explicit_sid_scheme(self):
+        self.assertTrue(
+            OracleConnector().accepts('oracle+sid://app@db.example/CLIENTDB')
+        )
+
     def test_ref_resolves_connection_settings_and_selected_table(self):
         connector = OracleConnector()
 
@@ -67,6 +72,36 @@ class OracleConnectorTests(unittest.TestCase):
             },
         )
         self.assertEqual(table, 'Customers')
+
+    def test_sid_ref_resolves_connection_settings_and_selected_table(self):
+        config, table = OracleConnector()._parts(
+            'oracle+sid://app@db.example:1522/CLIENTDB/Customers'
+        )
+
+        self.assertEqual(
+            config,
+            {
+                'host': 'db.example',
+                'port': 1522,
+                'sid': 'CLIENTDB',
+                'user': 'app',
+                'password': 'secret',
+            },
+        )
+        self.assertEqual(table, 'Customers')
+
+    def test_sid_ref_requires_explicit_sid(self):
+        with self.assertRaisesRegex(
+                ValueError, 'Oracle SID refs require an explicit SID'):
+            OracleConnector()._parts('oracle+sid://app@db.example')
+
+    def test_sid_ref_rejects_too_many_path_components_with_sid_message(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                'Oracle SID refs accept a SID and optional table path'):
+            OracleConnector()._parts(
+                'oracle+sid://app@db.example/CLIENTDB/table/extra'
+            )
 
     def test_ref_infers_service_name_from_user_when_omitted(self):
         config, table = OracleConnector()._parts(
@@ -275,6 +310,30 @@ class OracleConnectorTests(unittest.TestCase):
         )
         connection.close.assert_called_once_with()
 
+    def test_ls_connects_with_explicit_sid_descriptor(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='db.example:1521/CLIENTDB')
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([])
+        driver.connect = Mock(return_value=connection)
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            output, error = self.run_cli(
+                'ls', 'oracle+sid://app@db.example/CLIENTDB'
+            )
+
+        self.assertEqual(output, '')
+        self.assertEqual(error, '')
+        driver.makedsn.assert_called_once_with(
+            'db.example', 1521, sid='CLIENTDB'
+        )
+        driver.connect.assert_called_once_with(
+            user='app', password='secret', dsn='db.example:1521/CLIENTDB'
+        )
+        connection.close.assert_called_once_with()
+
     def test_oracle_names_distinguish_ordinary_and_quoted_identifiers(self):
         driver = types.ModuleType('oracledb')
         driver.Error = type('Error', (Exception,), {})
@@ -351,6 +410,33 @@ class OracleConnectorTests(unittest.TestCase):
         )
         self.assertNotIn('Name or service not known', error.getvalue())
 
+    def test_unreachable_oracle_sid_server_exits_with_helpful_message(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock(
+            side_effect=socket.gaierror(-2, 'Name or service not known')
+        )
+
+        error = StringIO()
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle+sid://app@db.example/CLIENTDB']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            'gitdata: could not connect to Oracle at '
+            'db.example:1521/CLIENTDB. Check the server name, confirm the '
+            'Oracle listener is running, and verify network access.\n',
+        )
+        self.assertNotIn('Name or service not known', error.getvalue())
+
     def test_oracle_authentication_failure_exits_with_helpful_message(self):
         driver = types.ModuleType('oracledb')
         driver.Error = type('Error', (Exception,), {})
@@ -423,6 +509,147 @@ class OracleConnectorTests(unittest.TestCase):
             "gitdata: Oracle service 'MISSING' was not found at "
             'db.example:1521. Check the service name and listener '
             'registration.\n',
+        )
+
+    def test_unknown_oracle_sid_exits_with_helpful_message(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        detail = SimpleNamespace(full_code='ORA-12505', message='driver detail')
+        driver.connect = Mock(side_effect=driver.Error(detail))
+
+        error = StringIO()
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle+sid://app@db.example/MISSING']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: Oracle SID 'MISSING' was not found at "
+            'db.example:1521. Check the SID and listener registration.\n',
+        )
+
+    def test_service_error_code_is_not_translated_as_missing_sid(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        detail = SimpleNamespace(
+            full_code='ORA-12514', message='service is not registered'
+        )
+        driver.connect = Mock(side_effect=driver.Error(detail))
+        error = StringIO()
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle+sid://app@db.example/CLIENTDB']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            'gitdata: Oracle operation failed at db.example:1521/CLIENTDB '
+            '(error ORA-12514). Check the connection settings and access '
+            'permissions.\n',
+        )
+        self.assertNotIn('was not found', error.getvalue())
+
+    def test_wrapped_service_error_is_not_translated_as_missing_sid(self):
+        config = {
+            'host': 'db.example', 'port': 1521, 'sid': 'CLIENTDB',
+            'user': 'app', 'password': 'secret',
+        }
+        detail = SimpleNamespace(
+            full_code='DPY-6005',
+            message='DPY-6005: failed. DPY-6001: service not registered',
+        )
+
+        translated = OracleConnector._connection_error(config, Exception(detail))
+
+        self.assertIn('could not connect to Oracle', str(translated))
+        self.assertNotIn('was not found', str(translated))
+
+    def test_sid_error_code_does_not_change_service_error_handling(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        detail = SimpleNamespace(
+            full_code='ORA-12505', message='SID is not registered'
+        )
+        driver.connect = Mock(side_effect=driver.Error(detail))
+        error = StringIO()
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle://app@db.example/FREEPDB1']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            'gitdata: Oracle operation failed at db.example:1521/FREEPDB1 '
+            '(error ORA-12505). Check the connection settings and access '
+            'permissions.\n',
+        )
+        self.assertNotIn('was not found', error.getvalue())
+
+    def test_wrapped_sid_error_does_not_change_service_error_handling(self):
+        config = {
+            'host': 'db.example', 'port': 1521,
+            'service_name': 'FREEPDB1', 'user': 'app', 'password': 'secret',
+        }
+        detail = SimpleNamespace(
+            full_code='DPY-6005',
+            message='DPY-6005: failed. DPY-6003: SID not registered',
+        )
+
+        translated = OracleConnector._connection_error(config, Exception(detail))
+
+        self.assertIn('could not connect to Oracle', str(translated))
+        self.assertNotIn('was not found', str(translated))
+
+    def test_wrapped_unknown_oracle_sid_exits_with_helpful_message(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        detail = SimpleNamespace(
+            full_code='DPY-6005',
+            message=(
+                'DPY-6005: cannot connect to database. '
+                'DPY-6003: SID is not registered with the listener. '
+                '(Similar to ORA-12505)'
+            ),
+        )
+        driver.connect = Mock(side_effect=driver.Error(detail))
+
+        error = StringIO()
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle+sid://app@db.example/MISSING']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: Oracle SID 'MISSING' was not found at "
+            'db.example:1521. Check the SID and listener registration.\n',
         )
 
     def test_failed_inferred_service_requests_an_explicit_service(self):
@@ -797,6 +1024,32 @@ class OracleConnectorTests(unittest.TestCase):
             error.getvalue(),
             "gitdata: Oracle table 'missing' was not found in service "
             "'FREEPDB1'. Check the table name.\n",
+        )
+
+    def test_unknown_oracle_table_in_sid_exits_with_helpful_message(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.fetchall.side_effect = [[], []]
+        driver.connect = Mock(return_value=connection)
+
+        error = StringIO()
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle+sid://app@db.example/CLIENTDB/missing']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: Oracle table 'missing' was not found in SID "
+            "'CLIENTDB'. Check the table name.\n",
         )
 
 

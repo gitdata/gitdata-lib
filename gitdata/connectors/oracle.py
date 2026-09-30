@@ -43,7 +43,7 @@ class OracleConnector(BaseConnector):
     def accepts(self, ref):
         return (
             isinstance(ref, str)
-            and ref.partition(':')[0].lower() == 'oracle'
+            and ref.partition(':')[0].lower() in ('oracle', 'oracle+sid')
         )
 
     def _parts(self, ref):
@@ -63,22 +63,32 @@ class OracleConnector(BaseConnector):
             raise OracleRefError('Oracle refs require a user and host')
 
         user = unquote(parts.username)
+        sid_ref = parts.scheme.lower() == 'oracle+sid'
         raw_path = parts.path.lstrip('/')
         raw_components = raw_path.split('/') if raw_path else []
         if len(raw_components) > 2 or not all(raw_components):
-            raise OracleRefError(
+            path_error = (
+                'Oracle SID refs accept a SID and optional table path'
+                if sid_ref else
                 'Oracle refs accept a service and optional table path'
             )
+            raise OracleRefError(path_error)
+        if sid_ref and not raw_components:
+            raise OracleRefError(
+                'Oracle SID refs require an explicit SID'
+            )
         service_inferred = not raw_components
-        service_name = (
+        connect_identifier = (
             user if service_inferred else unquote(raw_components[0])
         )
         table = (
             unquote(raw_components[1]) if len(raw_components) == 2 else None
         )
-        if '/' in service_name:
+        if '/' in connect_identifier:
+            identifier_kind = 'SID' if sid_ref else 'service'
             raise OracleRefError(
-                'Oracle service names containing slashes must be URL-encoded'
+                'Oracle {} names containing slashes must be URL-encoded'
+                .format(identifier_kind)
             )
         try:
             port = parts.port or 1521
@@ -90,16 +100,23 @@ class OracleConnector(BaseConnector):
                 'name another variable with GITDATA_PASSWORD_ENV'
             )
         password = password_from_environment('Oracle', OracleRefError)
+        connect_identifier_key = 'sid' if sid_ref else 'service_name'
         config = {
             'host': parts.hostname,
             'port': port,
-            'service_name': service_name,
+            connect_identifier_key: connect_identifier,
             'user': user,
             'password': password,
         }
         if service_inferred:
             config['_service_inferred'] = True
         return config, table
+
+    @staticmethod
+    def _connect_identifier(config):
+        if 'sid' in config:
+            return 'sid', 'SID', config['sid']
+        return 'service_name', 'service', config['service_name']
 
     @staticmethod
     def _safe_component(value):
@@ -120,22 +137,29 @@ class OracleConnector(BaseConnector):
         detail = error.args[0] if error.args else None
         full_code = cls._error_code(detail)
         detail_message = getattr(detail, 'message', '')
-        service_error = (
-            full_code in ('ORA-12514', 'DPY-6001')
+        identifier_key, _, identifier_value = cls._connect_identifier(config)
+        sid_ref = identifier_key == 'sid'
+        nested_identifier_code = 'DPY-6003:' if sid_ref else 'DPY-6001:'
+        identifier_codes = (
+            ('ORA-12505', 'DPY-6003') if sid_ref
+            else ('ORA-12514', 'DPY-6001')
+        )
+        identifier_error = (
+            full_code in identifier_codes
             or (
                 isinstance(detail_message, str)
-                and 'DPY-6001:' in detail_message
+                and nested_identifier_code in detail_message
             )
         )
+        identifier = cls._safe_component(identifier_value)
         host = cls._safe_component(config['host'])
-        service = cls._safe_component(config['service_name'])
         server = '{}:{}'.format(host, config['port'])
-        address = '{}/{}'.format(server, service)
+        address = '{}/{}'.format(server, identifier)
         network_errors = (
             'DPY-6000', 'DPY-6005', 'ORA-12170', 'ORA-12541',
             'ORA-12543', 'ORA-12545',
         )
-        if full_code in network_errors and not service_error:
+        if full_code in network_errors and not identifier_error:
             message = (
                 'could not connect to Oracle at {}. Check the server name, '
                 'confirm the Oracle listener is running, and verify network '
@@ -157,8 +181,13 @@ class OracleConnector(BaseConnector):
                 'PASSWORD or name another variable with '
                 'GITDATA_PASSWORD_ENV.'.format(config['user'])
             )
-        elif service_error:
-            if config.get('_service_inferred'):
+        elif identifier_error:
+            if sid_ref:
+                message = (
+                    'Oracle SID {!r} was not found at {}. Check the SID and '
+                    'listener registration.'.format(identifier, server)
+                )
+            elif config.get('_service_inferred'):
                 message = (
                     'Oracle service {!r}, inferred from user {!r}, was not '
                     'found at {}. Add an explicit service name to the ref.'
@@ -218,10 +247,11 @@ class OracleConnector(BaseConnector):
             ) from None
 
         try:
+            identifier_key, _, identifier = cls._connect_identifier(config)
             dsn = oracledb.makedsn(
                 config['host'],
                 config['port'],
-                service_name=config['service_name'],
+                **{identifier_key: identifier}
             )
             return oracledb.connect(
                 user=config['user'],
@@ -232,8 +262,9 @@ class OracleConnector(BaseConnector):
             raise cls._connection_error(config, error) from None
         except OSError:
             host = cls._safe_component(config['host'])
-            service = cls._safe_component(config['service_name'])
-            address = '{}:{}/{}'.format(host, config['port'], service)
+            _, _, identifier_value = cls._connect_identifier(config)
+            identifier = cls._safe_component(identifier_value)
+            address = '{}:{}/{}'.format(host, config['port'], identifier)
             raise ConnectorError(
                 'could not connect to Oracle at {}. Check the server name, '
                 'confirm the Oracle listener is running, and verify network '
@@ -286,9 +317,12 @@ class OracleConnector(BaseConnector):
             self._close(connection, config)
 
         if not schema:
+            _, identifier_kind, identifier = self._connect_identifier(config)
             raise ConnectorError(
-                'Oracle table {!r} was not found in service {!r}. Check the '
-                'table name.'.format(name, config['service_name'])
+                'Oracle table {!r} was not found in {} {!r}. Check the '
+                'table name.'.format(
+                    name, identifier_kind, identifier
+                )
             )
 
         columns = tuple(
@@ -422,9 +456,10 @@ class OracleConnector(BaseConnector):
             finally:
                 self._close(stats_connection, config)
 
+        _, _, database_name = self._connect_identifier(config)
         return {
             'type': 'database',
-            'name': config['service_name'],
+            'name': database_name,
             'table_names': names,
             'tables': tables(),
             'table_summaries': table_summaries(),

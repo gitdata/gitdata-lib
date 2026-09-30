@@ -198,7 +198,7 @@ gitdata ls -l "$TABLE"
 gitdata scan --limit 10 "$TABLE"
 ```
 
-Oracle references follow these shapes; port `1521` may be omitted:
+Oracle service-name references follow these shapes; port `1521` may be omitted:
 
 ```text
 oracle://user@host
@@ -209,6 +209,18 @@ oracle://user@host:port/service/table
 When the service is omitted, GitData first tries the username as the service
 name. If Oracle does not advertise that service, GitData asks for an explicit
 `/service` path.
+
+Some Oracle installations expose a connection target by SID rather than by a
+registered service name. Use the explicit `oracle+sid` scheme in that case:
+
+```text
+oracle+sid://user@host/SID
+oracle+sid://user@host:port/SID/table
+```
+
+Unlike a service-name reference, a SID reference always requires the `/SID`
+path. GitData passes it to `oracledb.makedsn(..., sid=...)`; it does not enable
+Oracle Thick mode.
 
 To use a password variable other than `PASSWORD`, set
 `GITDATA_PASSWORD_ENV` to its name:
