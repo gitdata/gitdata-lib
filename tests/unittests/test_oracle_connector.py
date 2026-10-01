@@ -54,11 +54,11 @@ class OracleConnectorTests(unittest.TestCase):
             OracleConnector().accepts('oracle+sid://app@db.example/CLIENTDB')
         )
 
-    def test_ref_resolves_connection_settings_and_selected_table(self):
+    def test_ref_resolves_connection_settings_schema_and_table(self):
         connector = OracleConnector()
 
-        config, table = connector._parts(
-            'oracle://app@db.example:1522/FREEPDB1/Customers'
+        config, schema, table = connector._parts(
+            'oracle://app@db.example:1522/FREEPDB1/SALES/Customers'
         )
 
         self.assertEqual(
@@ -71,11 +71,12 @@ class OracleConnectorTests(unittest.TestCase):
                 'password': 'secret',
             },
         )
+        self.assertEqual(schema, 'SALES')
         self.assertEqual(table, 'Customers')
 
-    def test_sid_ref_resolves_connection_settings_and_selected_table(self):
-        config, table = OracleConnector()._parts(
-            'oracle+sid://app@db.example:1522/CLIENTDB/Customers'
+    def test_sid_ref_resolves_connection_settings_schema_and_table(self):
+        config, schema, table = OracleConnector()._parts(
+            'oracle+sid://app@db.example:1522/CLIENTDB/SALES/Customers'
         )
 
         self.assertEqual(
@@ -88,6 +89,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'password': 'secret',
             },
         )
+        self.assertEqual(schema, 'SALES')
         self.assertEqual(table, 'Customers')
 
     def test_sid_ref_requires_explicit_sid(self):
@@ -98,24 +100,25 @@ class OracleConnectorTests(unittest.TestCase):
     def test_sid_ref_rejects_too_many_path_components_with_sid_message(self):
         with self.assertRaisesRegex(
                 ValueError,
-                'Oracle SID refs accept a SID and optional table path'):
+                'Oracle SID refs accept a SID, schema, and optional table path'):
             OracleConnector()._parts(
-                'oracle+sid://app@db.example/CLIENTDB/table/extra'
+                'oracle+sid://app@db.example/CLIENTDB/SALES/table/extra'
             )
 
     def test_ref_infers_service_name_from_user_when_omitted(self):
-        config, table = OracleConnector()._parts(
+        config, schema, table = OracleConnector()._parts(
             'oracle://gitdata_test@db.example'
         )
 
         self.assertEqual(config['service_name'], 'gitdata_test')
         self.assertEqual(config['user'], 'gitdata_test')
         self.assertTrue(config['_service_inferred'])
+        self.assertIsNone(schema)
         self.assertIsNone(table)
 
-    def test_ref_uses_path_table_default_port_and_password_variable(self):
-        config, table = OracleConnector()._parts(
-            'oracle://app@db.example/FREEPDB1/products'
+    def test_ref_uses_schema_table_default_port_and_password_variable(self):
+        config, schema, table = OracleConnector()._parts(
+            'oracle://app@db.example/FREEPDB1/SALES/products'
         )
 
         self.assertEqual(
@@ -128,6 +131,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'password': 'secret',
             },
         )
+        self.assertEqual(schema, 'SALES')
         self.assertEqual(table, 'products')
 
     def test_ref_uses_password_variable_named_by_gitdata_password_env(self):
@@ -136,11 +140,12 @@ class OracleConnectorTests(unittest.TestCase):
             'ORACLE_PASSWORD': 'custom-secret',
         }
         with patch.dict(os.environ, environment, clear=True):
-            config, table = OracleConnector()._parts(
-                'oracle://app@db.example/FREEPDB1/products'
+            config, schema, table = OracleConnector()._parts(
+                'oracle://app@db.example/FREEPDB1/SALES/products'
             )
 
         self.assertEqual(config['password'], 'custom-secret')
+        self.assertEqual(schema, 'SALES')
         self.assertEqual(table, 'products')
 
     def test_ref_reports_missing_default_password_environment_variable(self):
@@ -162,12 +167,12 @@ class OracleConnectorTests(unittest.TestCase):
                     'oracle://app@db.example/FREEPDB1/products'
                 )
 
-    def test_ref_rejects_more_than_service_and_table_path(self):
+    def test_ref_rejects_more_than_service_schema_and_table_path(self):
         with self.assertRaisesRegex(
                 ValueError,
-                'Oracle refs accept a service and optional table path'):
+                'Oracle refs accept a service, schema, and optional table path'):
             OracleConnector()._parts(
-                'oracle://app@db.example/FREEPDB1/products/extra'
+                'oracle://app@db.example/FREEPDB1/SALES/products/extra'
             )
 
     def test_ref_rejects_inline_passwords(self):
@@ -275,15 +280,15 @@ class OracleConnectorTests(unittest.TestCase):
                         'Oracle refs do not accept fragment selectors'):
                     OracleConnector()._parts(ref)
 
-    def test_ls_lists_oracle_tables_and_closes_connection(self):
+    def test_ls_lists_visible_oracle_schemas_and_closes_connection(self):
         driver = types.ModuleType('oracledb')
         driver.Error = type('Error', (Exception,), {})
         driver.makedsn = Mock(return_value='db.example:1521/FREEPDB1')
         connection = MagicMock()
         cursor = connection.cursor.return_value.__enter__.return_value
         cursor.__iter__.return_value = iter([
-            ('CUSTOMERS',),
-            ('MixedCaseTable',),
+            ('APP',),
+            ('MixedCaseOwner',),
             ('Danger\x1b[31m',),
         ])
         driver.connect = Mock(return_value=connection)
@@ -295,7 +300,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         self.assertEqual(
             output,
-            'customers\n"MixedCaseTable"\n"Danger\\x1b[31m"\n',
+            'app\n"MixedCaseOwner"\n"Danger\\x1b[31m"\n',
         )
         self.assertNotIn('\x1b', output)
         self.assertEqual(error, '')
@@ -306,7 +311,157 @@ class OracleConnectorTests(unittest.TestCase):
             user='app', password='secret', dsn='db.example:1521/FREEPDB1'
         )
         cursor.execute.assert_called_once_with(
-            'select table_name from user_tables order by table_name'
+            'select distinct owner from all_tables order by owner'
+        )
+        connection.close.assert_called_once_with()
+
+    def test_ls_long_summarizes_visible_oracle_schemas(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+
+        names_connection = MagicMock()
+        names_cursor = names_connection.cursor.return_value.__enter__.return_value
+        names_cursor.__iter__.return_value = iter([('SALES',)])
+
+        stats_connection = MagicMock()
+        stats_cursor = stats_connection.cursor.return_value.__enter__.return_value
+        stats_cursor.__iter__.return_value = iter([('SALES', 4, 125, None)])
+        driver.connect = Mock(side_effect=[names_connection, stats_connection])
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            output, error = self.run_cli(
+                'ls', '-l', 'oracle://app@db.example/FREEPDB1'
+            )
+
+        self.assertEqual(error, '')
+        self.assertIn('Schema', output)
+        self.assertIn('sales', output)
+        self.assertIn('4', output)
+        self.assertIn('125', output)
+        stats_cursor.execute.assert_called_once_with(
+            'select owner, count(*), case when count(num_rows) = count(*) '
+            'then sum(num_rows) end, cast(null as number) from all_tables '
+            'group by owner order by owner'
+        )
+        names_connection.close.assert_called_once_with()
+        stats_connection.close.assert_called_once_with()
+
+    def test_schema_summary_preserves_unknown_row_statistics(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        names_connection = MagicMock()
+        stats_connection = MagicMock()
+        names_cursor = names_connection.cursor.return_value.__enter__.return_value
+        stats_cursor = stats_connection.cursor.return_value.__enter__.return_value
+        names_cursor.__iter__.return_value = iter([('SALES',)])
+        stats_cursor.__iter__.return_value = iter([('SALES', 2, None, None)])
+        driver.connect = Mock(side_effect=[names_connection, stats_connection])
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            root = OracleConnector().fetch(
+                'oracle://app@db.example/FREEPDB1', count_rows=False
+            )
+            summaries = tuple(root['database_summaries'])
+
+        self.assertEqual(summaries[0]['rows'], '-')
+        self.assertNotIn('nvl(num_rows', stats_cursor.execute.call_args.args[0])
+
+    def test_ls_lists_tables_visible_in_selected_oracle_schema(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([('CUSTOMERS',), ('ORDERS',)])
+        driver.connect = Mock(return_value=connection)
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            output, error = self.run_cli(
+                'ls', 'oracle://app@db.example/FREEPDB1/SALES'
+            )
+
+        self.assertEqual(output, 'customers\norders\n')
+        self.assertEqual(error, '')
+        cursor.execute.assert_called_once_with(
+            'select table_name from all_tables where owner = :owner '
+            'order by table_name',
+            {'owner': 'SALES'},
+        )
+        connection.close.assert_called_once_with()
+
+    def test_schema_root_name_uses_resolved_oracle_owner(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([('CUSTOMERS',)])
+        driver.connect = Mock(return_value=connection)
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            root = OracleConnector().fetch(
+                'oracle://app@db.example/FREEPDB1/sales', count_rows=False
+            )
+
+        self.assertEqual(root['name'], 'sales')
+        cursor.execute.assert_called_once_with(
+            'select table_name from all_tables where owner = :owner '
+            'order by table_name',
+            {'owner': 'SALES'},
+        )
+        connection.close.assert_called_once_with()
+
+    def test_schema_children_preserve_resolved_quoted_owner(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        names_connection = MagicMock()
+        table_connection = MagicMock()
+        names_cursor = names_connection.cursor.return_value.__enter__.return_value
+        table_cursor = table_connection.cursor.return_value.__enter__.return_value
+        names_cursor.__iter__.return_value = iter([('MixedCaseTable',)])
+        table_cursor.fetchall.return_value = [
+            ('ID', 'NUMBER', 'N', None, 'NO', 'NO')
+        ]
+        driver.connect = Mock(side_effect=[names_connection, table_connection])
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            root = OracleConnector().fetch(
+                'oracle://app@db.example/FREEPDB1/%22MixedCaseOwner%22',
+                count_rows=False,
+            )
+            tuple(root['tables'])
+
+        self.assertEqual(root['name'], '"MixedCaseOwner"')
+        self.assertEqual(
+            table_cursor.execute.call_args.args[1],
+            {'owner': 'MixedCaseOwner', 'table_name': 'MixedCaseTable'},
+        )
+
+    def test_unknown_oracle_schema_exits_with_helpful_message(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.makedsn = Mock(return_value='dsn')
+        connection = MagicMock()
+        cursor = connection.cursor.return_value.__enter__.return_value
+        cursor.__iter__.return_value = iter([])
+        driver.connect = Mock(return_value=connection)
+
+        error = StringIO()
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with patch.object(
+                    sys, 'argv',
+                    ['gitdata', 'ls',
+                     'oracle://app@db.example/FREEPDB1/missing']):
+                with redirect_stderr(error):
+                    with self.assertRaises(SystemExit) as raised:
+                        main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: Oracle schema 'missing' has no tables visible to user "
+            "'app'. Check the schema name and access permissions.\n",
         )
         connection.close.assert_called_once_with()
 
@@ -345,7 +500,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         with patch.dict(sys.modules, {'oracledb': driver}):
             root = OracleConnector().fetch(
-                'oracle://app@db.example/FREEPDB1', count_rows=False
+                'oracle://app@db.example/FREEPDB1/SALES', count_rows=False
             )
 
         self.assertEqual(root['table_names'], ('foo', '"foo"', '"MixedName"'))
@@ -696,7 +851,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
-                'ls', 'oracle://app@db.example/FREEPDB1/customers'
+                'ls', 'oracle://app@db.example/FREEPDB1/SALES/customers'
             )
 
         self.assertEqual(output, 'id\n"DisplayName"\n')
@@ -704,7 +859,10 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertEqual(cursor.execute.call_count, 1)
         self.assertEqual(
             [call.args[1] for call in cursor.execute.call_args_list],
-            [{'table_name': 'CUSTOMERS'}],
+            [{'owner': 'SALES', 'table_name': 'CUSTOMERS'}],
+        )
+        self.assertIn(
+            'from all_tab_cols c', cursor.execute.call_args.args[0]
         )
         connection.close.assert_called_once_with()
 
@@ -724,7 +882,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
-                'ls', '-l', 'oracle://app@db.example/FREEPDB1/CUSTOMERS'
+                'ls', '-l', 'oracle://app@db.example/FREEPDB1/APP/CUSTOMERS'
             )
 
         self.assertEqual(error, '')
@@ -737,7 +895,7 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertIn('PRI', output)
         self.assertIn("'unknown'", output)
         metadata_query = cursor.execute.call_args.args[0]
-        self.assertIn('from user_tab_cols c', metadata_query)
+        self.assertIn('from all_tab_cols c', metadata_query)
         self.assertIn("c.user_generated = 'YES'", metadata_query)
 
     def test_ls_long_lists_oracle_table_metadata(self):
@@ -752,13 +910,14 @@ class OracleConnectorTests(unittest.TestCase):
         stats_connection = MagicMock()
         stats_cursor = stats_connection.cursor.return_value.__enter__.return_value
         stats_cursor.__iter__.return_value = iter([
-            ('CUSTOMERS', 3, 25, 1),
+            ('CUSTOMERS', 3, 25, None),
         ])
         driver.connect = Mock(side_effect=[names_connection, stats_connection])
 
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
-                'ls', '-l', 'oracle://app@db.example/FREEPDB1'
+                'ls', '-l',
+                'oracle://app@db.example/FREEPDB1/SALES'
             )
 
         self.assertEqual(error, '')
@@ -766,11 +925,18 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertIn('customers', output)
         self.assertIn('3', output)
         self.assertIn('25', output)
-        self.assertIn('1', output)
         names_connection.close.assert_called_once_with()
+        stats_cursor.execute.assert_called_once_with(
+            stats_cursor.execute.call_args.args[0], {'owner': 'SALES'}
+        )
+        self.assertIn('from all_tables t', stats_cursor.execute.call_args.args[0])
+        self.assertIn(
+            'left join all_tab_columns c', stats_cursor.execute.call_args.args[0]
+        )
+        self.assertNotIn('all_segments', stats_cursor.execute.call_args.args[0])
         stats_connection.close.assert_called_once_with()
 
-    def test_scan_streams_selected_oracle_table_and_closes_resources(self):
+    def test_scan_qualifies_quoted_oracle_owner_and_table(self):
         driver = types.ModuleType('oracledb')
         driver.Error = type('Error', (Exception,), {})
         driver.makedsn = Mock(return_value='dsn')
@@ -794,14 +960,23 @@ class OracleConnectorTests(unittest.TestCase):
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
                 'scan', '--no-count', '--limit', '2',
-                'oracle://app@db.example/FREEPDB1/customers'
+                'oracle://app@db.example/FREEPDB1/'
+                '%22MixedCaseOwner%22/%22MixedCaseTable%22'
             )
 
-        self.assertIn('customers: 2 columns, at least 2 rows (sampled)', output)
+        self.assertIn(
+            '"MixedCaseTable": 2 columns, at least 2 rows (sampled)', output
+        )
         self.assertIn('id', output)
         self.assertIn('name', output)
         self.assertEqual(error, 'Scanning...\n')
-        row_cursor.execute.assert_called_once_with('select * from "CUSTOMERS"')
+        self.assertEqual(
+            schema_cursor.execute.call_args.args[1],
+            {'owner': 'MixedCaseOwner', 'table_name': 'MixedCaseTable'},
+        )
+        row_cursor.execute.assert_called_once_with(
+            'select * from "MixedCaseOwner"."MixedCaseTable"'
+        )
         row_cursor.close.assert_called_once_with()
         row_connection.close.assert_called_once_with()
 
@@ -835,7 +1010,7 @@ class OracleConnectorTests(unittest.TestCase):
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
                 'scan', '--no-count', '--limit', '1',
-                'oracle://app@db.example/FREEPDB1/DOCUMENTS'
+                'oracle://app@db.example/FREEPDB1/APP/DOCUMENTS'
             )
 
         self.assertEqual(lob.read_args, (1, 4096))
@@ -870,13 +1045,13 @@ class OracleConnectorTests(unittest.TestCase):
         with patch.dict(sys.modules, {'oracledb': driver}):
             output, error = self.run_cli(
                 'scan', '--limit', '2',
-                'oracle://app@db.example/FREEPDB1/CUSTOMERS'
+                'oracle://app@db.example/FREEPDB1/APP/CUSTOMERS'
             )
 
         self.assertIn('customers: 1 column, 3 rows (sampled)', output)
         self.assertEqual(error, 'Scanning...\n')
         count_cursor.execute.assert_called_once_with(
-            'select count(*) from "CUSTOMERS"'
+            'select count(*) from "APP"."CUSTOMERS"'
         )
         count_connection.close.assert_called_once_with()
 
@@ -959,7 +1134,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'scan', '--no-count',
-                     'oracle://app@db.example/FREEPDB1/CUSTOMERS']):
+                     'oracle://app@db.example/FREEPDB1/APP/CUSTOMERS']):
                 with redirect_stderr(error), redirect_stdout(StringIO()):
                     with self.assertRaises(SystemExit) as raised:
                         main()
@@ -991,7 +1166,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'scan', '--no-count',
-                     'oracle://app@db.example/FREEPDB1/CUSTOMERS']):
+                     'oracle://app@db.example/FREEPDB1/APP/CUSTOMERS']):
                 with redirect_stderr(error), redirect_stdout(StringIO()):
                     with self.assertRaises(SystemExit) as raised:
                         main()
@@ -1014,7 +1189,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'ls',
-                     'oracle://app@db.example/FREEPDB1/missing']):
+                     'oracle://app@db.example/FREEPDB1/APP/missing']):
                 with redirect_stderr(error):
                     with self.assertRaises(SystemExit) as raised:
                         main()
@@ -1022,8 +1197,8 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 1)
         self.assertEqual(
             error.getvalue(),
-            "gitdata: Oracle table 'missing' was not found in service "
-            "'FREEPDB1'. Check the table name.\n",
+            "gitdata: Oracle table 'missing' was not found in schema "
+            "'APP'. Check the table name.\n",
         )
 
     def test_unknown_oracle_table_in_sid_exits_with_helpful_message(self):
@@ -1040,7 +1215,7 @@ class OracleConnectorTests(unittest.TestCase):
             with patch.object(
                     sys, 'argv',
                     ['gitdata', 'ls',
-                     'oracle+sid://app@db.example/CLIENTDB/missing']):
+                     'oracle+sid://app@db.example/CLIENTDB/APP/missing']):
                 with redirect_stderr(error):
                     with self.assertRaises(SystemExit) as raised:
                         main()
@@ -1048,8 +1223,8 @@ class OracleConnectorTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 1)
         self.assertEqual(
             error.getvalue(),
-            "gitdata: Oracle table 'missing' was not found in SID "
-            "'CLIENTDB'. Check the table name.\n",
+            "gitdata: Oracle table 'missing' was not found in schema "
+            "'APP'. Check the table name.\n",
         )
 
 

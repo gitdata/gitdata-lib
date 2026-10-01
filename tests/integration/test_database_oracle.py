@@ -62,14 +62,21 @@ class TestOracleDatabase(unittest.TestCase):
         self._drop_table()
         self._drop_quoted_table()
 
-    def _ref(self, table=None):
+    def _connection_ref(self):
         get = os.environ.get
-        ref = 'oracle://{}@{}:{}/{}'.format(
+        return 'oracle://{}@{}:{}/{}'.format(
             quote(os.environ['GITDATA_TEST_ORACLE_USER'], safe=''),
             get('GITDATA_TEST_ORACLE_HOST', '127.0.0.1'),
             int(get('GITDATA_TEST_ORACLE_PORT', '1521')),
             quote(os.environ['GITDATA_TEST_ORACLE_SERVICE_NAME'], safe=''),
         )
+
+    def _ref(self, table=None):
+        schema = os.environ.get(
+            'GITDATA_TEST_ORACLE_SCHEMA',
+            os.environ['GITDATA_TEST_ORACLE_USER'].upper(),
+        )
+        ref = self._connection_ref() + '/' + quote(schema, safe='')
         if table is not None:
             ref += '/' + quote(table, safe='')
         return ref
@@ -146,6 +153,16 @@ class TestOracleDatabase(unittest.TestCase):
         )
         self.db.commit()
 
+        output, error = self._run_cli('ls', self._connection_ref())
+        self.assertIn(
+            os.environ.get(
+                'GITDATA_TEST_ORACLE_SCHEMA',
+                os.environ['GITDATA_TEST_ORACLE_USER'].upper(),
+            ).lower(),
+            output.splitlines(),
+        )
+        self.assertEqual(error, '')
+
         output, error = self._run_cli('ls', self._ref())
         self.assertIn(self.table_name, output.splitlines())
         self.assertEqual(error, '')
@@ -179,6 +196,27 @@ class TestOracleDatabase(unittest.TestCase):
         self.assertEqual(report['row_count'], 3)
         self.assertEqual(report['rows_scanned'], 2)
         self.assertTrue(report['sampled'])
+
+    def test_discovers_and_scans_cross_schema_table(self):
+        output, error = self._run_cli('ls', self._connection_ref())
+        self.assertIn('sys', output.splitlines())
+        self.assertEqual(error, '')
+
+        sys_ref = '{}/SYS'.format(self._connection_ref())
+        output, error = self._run_cli('ls', sys_ref)
+        self.assertIn('dual', output.splitlines())
+        self.assertEqual(error, '')
+
+        dual_ref = '{}/DUAL'.format(sys_ref)
+        output, error = self._run_cli('ls', '-l', dual_ref)
+        self.assertIn('dummy', output)
+        self.assertEqual(error, '')
+
+        output, error = self._run_cli(
+            'scan', '--no-count', '--limit', '1', dual_ref
+        )
+        self.assertIn('X', output)
+        self.assertEqual(error, 'Scanning...\n')
 
     def test_quoted_metadata_names_round_trip_to_column_lookup(self):
         self.db('''
