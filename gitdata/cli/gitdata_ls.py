@@ -50,6 +50,8 @@ def _print_verbose(root, items):
     labels, keys, widths = _LAYOUTS.get(
         root['type'], (('Name', 'Type'), ('name', 'type'), (35, 12))
     )
+    if root.get('item_label'):
+        labels = (root['item_label'],) + labels[1:]
     print(_row(labels, widths))
     print(_row(('-' * width for width in widths), widths))
     for item in items:

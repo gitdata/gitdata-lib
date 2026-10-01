@@ -57,7 +57,8 @@ class OracleConnector(BaseConnector):
             )
         if '#' in ref:
             raise OracleRefError(
-                'Oracle refs do not accept fragment selectors; use /table'
+                'Oracle refs do not accept fragment selectors; use '
+                '/schema/table'
             )
         if not parts.username or not parts.hostname:
             raise OracleRefError('Oracle refs require a user and host')
@@ -66,11 +67,11 @@ class OracleConnector(BaseConnector):
         sid_ref = parts.scheme.lower() == 'oracle+sid'
         raw_path = parts.path.lstrip('/')
         raw_components = raw_path.split('/') if raw_path else []
-        if len(raw_components) > 2 or not all(raw_components):
+        if len(raw_components) > 3 or not all(raw_components):
             path_error = (
-                'Oracle SID refs accept a SID and optional table path'
+                'Oracle SID refs accept a SID, schema, and optional table path'
                 if sid_ref else
-                'Oracle refs accept a service and optional table path'
+                'Oracle refs accept a service, schema, and optional table path'
             )
             raise OracleRefError(path_error)
         if sid_ref and not raw_components:
@@ -81,8 +82,11 @@ class OracleConnector(BaseConnector):
         connect_identifier = (
             user if service_inferred else unquote(raw_components[0])
         )
+        schema = (
+            unquote(raw_components[1]) if len(raw_components) >= 2 else None
+        )
         table = (
-            unquote(raw_components[1]) if len(raw_components) == 2 else None
+            unquote(raw_components[2]) if len(raw_components) == 3 else None
         )
         if '/' in connect_identifier:
             identifier_kind = 'SID' if sid_ref else 'service'
@@ -110,7 +114,7 @@ class OracleConnector(BaseConnector):
         }
         if service_inferred:
             config['_service_inferred'] = True
-        return config, table
+        return config, schema, table
 
     @staticmethod
     def _connect_identifier(config):
@@ -283,7 +287,12 @@ class OracleConnector(BaseConnector):
             return (name,)
         return (name.upper(), name)
 
-    def _table(self, config, name, count_rows, resolved=False):
+    def _table(
+            self, config, owner, name, count_rows, resolved=False,
+            owner_resolved=False):
+        actual_owner = (
+            owner if owner_resolved else self._selector_candidates(owner)[0]
+        )
         connection = self._connect(config)
         try:
             with self._translate_errors(config):
@@ -291,14 +300,16 @@ class OracleConnector(BaseConnector):
                     query = (
                         'select c.column_name, c.data_type, c.nullable, '
                         'c.data_default, c.identity_column, c.virtual_column, '
-                        "case when exists (select 1 from user_constraints k "
-                        'join user_cons_columns kc on kc.constraint_name = '
-                        "k.constraint_name where k.constraint_type = 'P' and "
-                        'k.table_name = c.table_name and kc.table_name = '
-                        'c.table_name and kc.column_name = c.column_name) '
+                        "case when exists (select 1 from all_constraints k "
+                        'join all_cons_columns kc on kc.owner = k.owner and '
+                        'kc.constraint_name = k.constraint_name where '
+                        "k.constraint_type = 'P' and k.owner = c.owner and "
+                        'k.table_name = c.table_name and kc.owner = c.owner '
+                        'and kc.table_name = c.table_name and '
+                        'kc.column_name = c.column_name) '
                         "then 'PRI' else '-' end, c.data_precision, "
                         'c.data_scale, c.char_length, c.char_used '
-                        'from user_tab_cols c where '
+                        'from all_tab_cols c where c.owner = :owner and '
                         "c.user_generated = 'YES' and "
                         'c.table_name = :table_name order by c.column_id'
                     )
@@ -308,7 +319,13 @@ class OracleConnector(BaseConnector):
                     schema = ()
                     actual_name = name
                     for candidate in candidates:
-                        cursor.execute(query, {'table_name': candidate})
+                        cursor.execute(
+                            query,
+                            {
+                                'owner': actual_owner,
+                                'table_name': candidate,
+                            },
+                        )
                         schema = tuple(cursor.fetchall())
                         if schema:
                             actual_name = candidate
@@ -317,18 +334,17 @@ class OracleConnector(BaseConnector):
             self._close(connection, config)
 
         if not schema:
-            _, identifier_kind, identifier = self._connect_identifier(config)
             raise ConnectorError(
-                'Oracle table {!r} was not found in {} {!r}. Check the '
-                'table name.'.format(
-                    name, identifier_kind, identifier
-                )
+                'Oracle table {!r} was not found in schema {!r}. Check the '
+                'table name.'.format(name, owner)
             )
 
         columns = tuple(
             self._normalize_identifier(row[0]) for row in schema
         )
-        quoted = self._quoted(actual_name)
+        quoted = '{}.{}'.format(
+            self._quoted(actual_owner), self._quoted(actual_name)
+        )
 
         def eager_count():
             count_connection = self._connect(config)
@@ -398,16 +414,72 @@ class OracleConnector(BaseConnector):
     def fetch(self, ref, count_rows=True):
         if not self.accepts(ref):
             return None
-        config, selected_table = self._parts(ref)
+        config, selected_schema, selected_table = self._parts(ref)
         if selected_table:
-            return self._table(config, selected_table, count_rows)
+            return self._table(
+                config, selected_schema, selected_table, count_rows
+            )
+        if selected_schema is None:
+            connection = self._connect(config)
+            try:
+                with self._translate_errors(config):
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            'select distinct owner from all_tables order by owner'
+                        )
+                        names = tuple(
+                            self._normalize_identifier(row[0]) for row in cursor
+                        )
+            finally:
+                self._close(connection, config)
+            _, _, connection_name = self._connect_identifier(config)
 
+            def database_summaries():
+                stats_connection = self._connect(config)
+                try:
+                    with self._translate_errors(config):
+                        with stats_connection.cursor() as cursor:
+                            cursor.execute(
+                                'select owner, count(*), '
+                                'case when count(num_rows) = count(*) '
+                                'then sum(num_rows) end, '
+                                'cast(null as number) from all_tables '
+                                'group by owner order by owner'
+                            )
+                            for row in cursor:
+                                yield {
+                                    'name': self._normalize_identifier(row[0]),
+                                    'type': 'database',
+                                    'tables': int(row[1]),
+                                    'rows': (
+                                        int(row[2])
+                                        if row[2] is not None else '-'
+                                    ),
+                                    'size': (
+                                        int(row[3])
+                                        if row[3] is not None else '-'
+                                    ),
+                                }
+                finally:
+                    self._close(stats_connection, config)
+
+            return {
+                'type': 'server',
+                'name': connection_name,
+                'item_label': 'Schema',
+                'database_names': names,
+                'database_summaries': database_summaries(),
+            }
+
+        actual_owner = self._selector_candidates(selected_schema)[0]
         connection = self._connect(config)
         try:
             with self._translate_errors(config):
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        'select table_name from user_tables order by table_name'
+                        'select table_name from all_tables '
+                        'where owner = :owner order by table_name',
+                        {'owner': actual_owner},
                     )
                     table_pairs = tuple(
                         (self._normalize_identifier(row[0]), row[0])
@@ -416,12 +488,22 @@ class OracleConnector(BaseConnector):
         finally:
             self._close(connection, config)
 
+        if not table_pairs:
+            raise ConnectorError(
+                'Oracle schema {!r} has no tables visible to user {!r}. '
+                'Check the schema name and access permissions.'.format(
+                    self._safe_component(selected_schema),
+                    self._safe_component(config['user']),
+                )
+            )
+
         names = tuple(display for display, _ in table_pairs)
 
         def tables():
             for _, actual_name in table_pairs:
                 yield self._table(
-                    config, actual_name, count_rows, resolved=True
+                    config, actual_owner, actual_name, count_rows,
+                    resolved=True, owner_resolved=True
                 )
 
         def table_summaries():
@@ -431,15 +513,14 @@ class OracleConnector(BaseConnector):
                     with stats_connection.cursor() as cursor:
                         cursor.execute(
                             'select t.table_name, count(c.column_name), '
-                            't.num_rows, round(nvl(s.bytes, 0) / 1024 / 1024) '
-                            'from user_tables t left join user_tab_columns c '
-                            'on c.table_name = t.table_name left join '
-                            '(select segment_name, sum(bytes) bytes from '
-                            'user_segments where segment_type in '
-                            "('TABLE', 'TABLE PARTITION') group by segment_name) s "
-                            'on s.segment_name = t.table_name group by '
-                            't.table_name, t.num_rows, s.bytes order by '
-                            't.table_name'
+                            't.num_rows, cast(null as number) '
+                            'from all_tables t left join all_tab_columns c '
+                            'on c.owner = t.owner and '
+                            'c.table_name = t.table_name '
+                            'where t.owner = :owner group by '
+                            't.table_name, t.num_rows order by '
+                            't.table_name',
+                            {'owner': actual_owner},
                         )
                         for row in cursor:
                             yield {
@@ -456,10 +537,9 @@ class OracleConnector(BaseConnector):
             finally:
                 self._close(stats_connection, config)
 
-        _, _, database_name = self._connect_identifier(config)
         return {
             'type': 'database',
-            'name': database_name,
+            'name': self._normalize_identifier(actual_owner),
             'table_names': names,
             'tables': tables(),
             'table_summaries': table_summaries(),

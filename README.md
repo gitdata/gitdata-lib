@@ -178,18 +178,25 @@ Install the optional Oracle driver, then set the password. GitData reads
 python3 -m pip install 'gitdata-lib[oracle]'
 export PASSWORD='your-password'
 
-DATABASE='oracle://app@db.example.com/FREEPDB1'
-TABLE="${DATABASE}/orders"
+CONNECTION='oracle://app@db.example.com/FREEPDB1'
+SCHEMA="${CONNECTION}/APP"
+TABLE="${SCHEMA}/orders"
 ```
 
-Explore the service and its tables with the same commands:
+Explore the service, visible schemas, and their tables with the same commands:
 
 ```bash
-# List tables owned by the connected user
-gitdata ls "$DATABASE"
+# List schemas containing tables visible to the connected user
+gitdata ls "$CONNECTION"
 
-# Show table counts and sizes
-gitdata ls -l "$DATABASE"
+# Show visible-schema table and estimated-row counts
+gitdata ls -l "$CONNECTION"
+
+# List tables visible in one schema
+gitdata ls "$SCHEMA"
+
+# Show table column and estimated-row counts; size may be unavailable
+gitdata ls -l "$SCHEMA"
 
 # Show column details
 gitdata ls -l "$TABLE"
@@ -203,7 +210,8 @@ Oracle service-name references follow these shapes; port `1521` may be omitted:
 ```text
 oracle://user@host
 oracle://user@host:port/service
-oracle://user@host:port/service/table
+oracle://user@host:port/service/schema
+oracle://user@host:port/service/schema/table
 ```
 
 When the service is omitted, GitData first tries the username as the service
@@ -215,7 +223,8 @@ registered service name. Use the explicit `oracle+sid` scheme in that case:
 
 ```text
 oracle+sid://user@host/SID
-oracle+sid://user@host:port/SID/table
+oracle+sid://user@host:port/SID/schema
+oracle+sid://user@host:port/SID/schema/table
 ```
 
 Unlike a service-name reference, a SID reference always requires the `/SID`
@@ -231,7 +240,11 @@ export ORACLE_PASSWORD='your-password'
 ```
 
 Inline passwords, query parameters, and fragment selectors are not accepted.
-Ordinary Oracle table and column names are shown in lowercase. Quoted identifiers
-are shown with their double quotes so names that differ only by Oracle quoting
-remain distinct; use the displayed spelling as the final path component when
-selecting one (the quotes may be URL-encoded as `%22`).
+After connecting, GitData uses Oracle's permission-aware `ALL_*` dictionary
+views: the connection root lists schemas containing tables visible to the user,
+and a schema path lists its visible tables. Table references must include the
+schema segment; the earlier `/service/table` shorthand is not supported.
+Ordinary Oracle schema, table, and column names are shown in lowercase. Quoted
+identifiers are shown with their double quotes so names that differ only by
+Oracle quoting remain distinct; use the displayed spelling as the corresponding
+path component (the quotes may be URL-encoded as `%22`).
