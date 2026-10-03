@@ -2,17 +2,24 @@
 
 import builtins
 import importlib
+import os
 import sys
 import types
 import unittest
 from unittest.mock import Mock, call, patch
 
 from gitdata.database import connect
+from gitdata.database.common import DatabaseException
+from gitdata.oracle_client import reset_oracle_client_state
 
 
 class TestOracleOptionalDependency(unittest.TestCase):
 
+    def setUp(self):
+        reset_oracle_client_state()
+
     def tearDown(self):
+        reset_oracle_client_state()
         sys.modules.pop('gitdata.database.oracle', None)
 
     def test_missing_driver_has_install_instructions(self):
@@ -57,6 +64,7 @@ class TestOracleOptionalDependency(unittest.TestCase):
 
     def test_connect_uses_thin_driver_with_service_name(self):
         driver = types.ModuleType('oracledb')
+        driver.init_oracle_client = Mock()
         driver.makedsn = Mock(return_value='db.example:1522/FREEPDB1')
         driver.connect = Mock(return_value=Mock())
 
@@ -71,12 +79,78 @@ class TestOracleOptionalDependency(unittest.TestCase):
             )
             database.connect()
 
+        driver.init_oracle_client.assert_not_called()
         driver.makedsn.assert_called_once_with(
             'db.example', 1522, service_name='FREEPDB1'
         )
         driver.connect.assert_called_once_with(
             user='app', password='secret', dsn='db.example:1522/FREEPDB1'
         )
+
+    def test_connect_thick_inits_oracle_client_once(self):
+        driver = types.ModuleType('oracledb')
+        driver.init_oracle_client = Mock()
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock(return_value=Mock())
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            connect(
+                'oracle',
+                thick=True,
+                service_name='FREEPDB1',
+                user='app',
+                password='secret',
+            )
+            connect(
+                'oracle',
+                thick=True,
+                service_name='FREEPDB1',
+                user='app',
+                password='secret',
+            )
+
+        driver.init_oracle_client.assert_called_once_with()
+
+    def test_connect_thick_passes_client_lib_dir(self):
+        driver = types.ModuleType('oracledb')
+        driver.init_oracle_client = Mock()
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock(return_value=Mock())
+
+        with patch.dict(os.environ, {'GITDATA_ORACLE_CLIENT_LIB_DIR': '/opt/oracle/lib'}):
+            with patch.dict(sys.modules, {'oracledb': driver}):
+                connect(
+                    'oracle',
+                    thick=True,
+                    service_name='FREEPDB1',
+                    user='app',
+                    password='secret',
+                )
+
+        driver.init_oracle_client.assert_called_once_with(
+            lib_dir='/opt/oracle/lib'
+        )
+
+    def test_connect_thick_missing_instant_client_fails_clearly(self):
+        driver = types.ModuleType('oracledb')
+        driver.init_oracle_client = Mock(side_effect=Exception('DPI-1047'))
+        driver.makedsn = Mock()
+        driver.connect = Mock()
+
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with self.assertRaises(DatabaseException) as raised:
+                connect(
+                    'oracle',
+                    thick=True,
+                    service_name='FREEPDB1',
+                    user='app',
+                    password='secret',
+                )
+
+        self.assertIn('Instant Client', str(raised.exception))
+        self.assertNotIn('DPI-1047', str(raised.exception))
+        driver.connect.assert_not_called()
+        driver.makedsn.assert_not_called()
 
     def test_execute_many_translates_every_positional_row(self):
         driver = types.ModuleType('oracledb')

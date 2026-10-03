@@ -1,7 +1,9 @@
 """Oracle Database support via the optional python-oracledb driver."""
 
+from gitdata.oracle_client import OracleClientError, prepare_oracle_client
+
 from ..utils import Bunch
-from .common import Database
+from .common import Database, DatabaseException
 
 
 def _normalize_identifier(name):
@@ -17,6 +19,12 @@ class OracleDatabase(Database):
 
     def __init__(self, *args, **kwargs):
         import oracledb
+
+        thick = kwargs.pop('thick', False)
+        try:
+            prepare_oracle_client(oracledb, thick)
+        except OracleClientError as error:
+            raise DatabaseException(str(error)) from None
 
         host = kwargs.pop('host', None)
         port = kwargs.pop('port', None)

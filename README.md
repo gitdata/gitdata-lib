@@ -231,6 +231,20 @@ Unlike a service-name reference, a SID reference always requires the `/SID`
 path. GitData passes it to `oracledb.makedsn(..., sid=...)`; it does not enable
 Oracle Thick mode.
 
+Some Oracle databases accept connections only through Oracle Instant Client
+(python-oracledb Thick mode). Add `+thick` to the scheme; token order does not
+matter:
+
+```text
+oracle+thick://user@host/service
+oracle+sid+thick://user@host/SID
+oracle+thick+sid://user@host/SID
+```
+
+Ordinary `oracle://` and `oracle+sid://` refs stay in Thin mode and do not
+require Instant Client. If Instant Client is not on the default library path,
+set `GITDATA_ORACLE_CLIENT_LIB_DIR` to its directory.
+
 To use a password variable other than `PASSWORD`, set
 `GITDATA_PASSWORD_ENV` to its name:
 

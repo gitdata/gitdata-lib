@@ -9,6 +9,9 @@ from gitdata.connectors.common import (
     ConnectorError,
     password_from_environment,
 )
+from gitdata.oracle_client import OracleClientError, prepare_oracle_client
+
+_SCHEME_TOKENS = frozenset({'sid', 'thick'})
 
 
 class OracleRefError(ConnectorError, ValueError):
@@ -41,10 +44,10 @@ class OracleConnector(BaseConnector):
         return data_type
 
     def accepts(self, ref):
-        return (
-            isinstance(ref, str)
-            and ref.partition(':')[0].lower() in ('oracle', 'oracle+sid')
-        )
+        if not isinstance(ref, str):
+            return False
+        scheme = ref.partition(':')[0].lower()
+        return scheme == 'oracle' or scheme.startswith('oracle+')
 
     def _parts(self, ref):
         try:
@@ -64,7 +67,17 @@ class OracleConnector(BaseConnector):
             raise OracleRefError('Oracle refs require a user and host')
 
         user = unquote(parts.username)
-        sid_ref = parts.scheme.lower() == 'oracle+sid'
+        tokens = parts.scheme.lower().split('+')
+        if not tokens or tokens[0] != 'oracle':
+            raise OracleRefError('Oracle refs require an oracle scheme')
+        extras = tokens[1:]
+        unknown = [token for token in extras if token not in _SCHEME_TOKENS]
+        if unknown or len(extras) != len(set(extras)):
+            raise OracleRefError(
+                'Oracle ref scheme is not supported: {!r}'.format(parts.scheme)
+            )
+        sid_ref = 'sid' in extras
+        thick = 'thick' in extras
         raw_path = parts.path.lstrip('/')
         raw_components = raw_path.split('/') if raw_path else []
         if len(raw_components) > 3 or not all(raw_components):
@@ -111,6 +124,7 @@ class OracleConnector(BaseConnector):
             connect_identifier_key: connect_identifier,
             'user': user,
             'password': password,
+            'thick': thick,
         }
         if service_inferred:
             config['_service_inferred'] = True
@@ -251,6 +265,7 @@ class OracleConnector(BaseConnector):
             ) from None
 
         try:
+            prepare_oracle_client(oracledb, config.get('thick'))
             identifier_key, _, identifier = cls._connect_identifier(config)
             dsn = oracledb.makedsn(
                 config['host'],
@@ -262,6 +277,8 @@ class OracleConnector(BaseConnector):
                 password=config['password'],
                 dsn=dsn,
             )
+        except OracleClientError as error:
+            raise ConnectorError(str(error)) from None
         except oracledb.Error as error:
             raise cls._connection_error(config, error) from None
         except OSError:

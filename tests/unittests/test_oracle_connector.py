@@ -12,8 +12,9 @@ import unittest
 from unittest.mock import MagicMock, Mock, call, patch
 
 from gitdata.cli import main
-from gitdata.connectors.common import get_connectors
+from gitdata.connectors.common import ConnectorError, get_connectors
 from gitdata.connectors.oracle import OracleConnector
+from gitdata.oracle_client import reset_oracle_client_state
 
 
 class OracleConnectorTests(unittest.TestCase):
@@ -25,6 +26,8 @@ class OracleConnectorTests(unittest.TestCase):
         )
         password.start()
         self.addCleanup(password.stop)
+        reset_oracle_client_state()
+        self.addCleanup(reset_oracle_client_state)
 
     def run_cli(self, *arguments):
         output = StringIO()
@@ -69,6 +72,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'service_name': 'FREEPDB1',
                 'user': 'app',
                 'password': 'secret',
+                'thick': False,
             },
         )
         self.assertEqual(schema, 'SALES')
@@ -87,10 +91,131 @@ class OracleConnectorTests(unittest.TestCase):
                 'sid': 'CLIENTDB',
                 'user': 'app',
                 'password': 'secret',
+                'thick': False,
             },
         )
         self.assertEqual(schema, 'SALES')
         self.assertEqual(table, 'Customers')
+
+    def test_connector_accepts_thick_scheme_tokens(self):
+        connector = OracleConnector()
+        self.assertTrue(
+            connector.accepts('oracle+thick://app@db.example/FREEPDB1')
+        )
+        self.assertTrue(
+            connector.accepts('oracle+sid+thick://app@db.example/CLIENTDB')
+        )
+        self.assertTrue(
+            connector.accepts('oracle+thick+sid://app@db.example/CLIENTDB')
+        )
+
+    def test_thick_ref_resolves_connection_settings(self):
+        config, schema, table = OracleConnector()._parts(
+            'oracle+thick://app@db.example:1522/FREEPDB1/SALES/Customers'
+        )
+
+        self.assertEqual(
+            config,
+            {
+                'host': 'db.example',
+                'port': 1522,
+                'service_name': 'FREEPDB1',
+                'user': 'app',
+                'password': 'secret',
+                'thick': True,
+            },
+        )
+        self.assertEqual(schema, 'SALES')
+        self.assertEqual(table, 'Customers')
+
+    def test_thick_sid_ref_accepts_either_token_order(self):
+        refs = (
+            'oracle+sid+thick://app@db.example/CLIENTDB/SALES/Customers',
+            'oracle+thick+sid://app@db.example/CLIENTDB/SALES/Customers',
+        )
+        for ref in refs:
+            with self.subTest(ref=ref):
+                config, schema, table = OracleConnector()._parts(ref)
+                self.assertEqual(config['sid'], 'CLIENTDB')
+                self.assertTrue(config['thick'])
+                self.assertEqual(schema, 'SALES')
+                self.assertEqual(table, 'Customers')
+
+    def test_unknown_scheme_token_is_rejected(self):
+        with self.assertRaisesRegex(
+                ValueError, 'Oracle ref scheme is not supported'):
+            OracleConnector()._parts(
+                'oracle+wallet://app@db.example/FREEPDB1'
+            )
+
+    def test_duplicate_scheme_token_is_rejected(self):
+        with self.assertRaisesRegex(
+                ValueError, 'Oracle ref scheme is not supported'):
+            OracleConnector()._parts(
+                'oracle+thick+thick://app@db.example/FREEPDB1'
+            )
+
+    def test_thin_connect_does_not_init_oracle_client(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.init_oracle_client = Mock()
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock(return_value=Mock())
+        config, _, _ = OracleConnector()._parts(
+            'oracle://app@db.example/FREEPDB1'
+        )
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            OracleConnector._connect(config)
+        driver.init_oracle_client.assert_not_called()
+
+    def test_thick_connect_inits_oracle_client_once_without_lib_dir(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.init_oracle_client = Mock()
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock(return_value=Mock())
+        config, _, _ = OracleConnector()._parts(
+            'oracle+thick://app@db.example/FREEPDB1'
+        )
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            OracleConnector._connect(config)
+            OracleConnector._connect(config)
+        driver.init_oracle_client.assert_called_once_with()
+
+    def test_thick_connect_passes_client_lib_dir(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.init_oracle_client = Mock()
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock(return_value=Mock())
+        config, _, _ = OracleConnector()._parts(
+            'oracle+thick://app@db.example/FREEPDB1'
+        )
+        with patch.dict(os.environ, {'GITDATA_ORACLE_CLIENT_LIB_DIR': '/opt/oracle/lib'}):
+            with patch.dict(sys.modules, {'oracledb': driver}):
+                OracleConnector._connect(config)
+        driver.init_oracle_client.assert_called_once_with(
+            lib_dir='/opt/oracle/lib'
+        )
+
+    def test_thick_connect_missing_instant_client_fails_clearly(self):
+        driver = types.ModuleType('oracledb')
+        driver.Error = type('Error', (Exception,), {})
+        driver.init_oracle_client = Mock(
+            side_effect=Exception('DPI-1047: Oracle Client library cannot be loaded')
+        )
+        driver.makedsn = Mock(return_value='dsn')
+        driver.connect = Mock()
+        config, _, _ = OracleConnector()._parts(
+            'oracle+thick://app@db.example/FREEPDB1'
+        )
+        with patch.dict(sys.modules, {'oracledb': driver}):
+            with self.assertRaises(ConnectorError) as raised:
+                OracleConnector._connect(config)
+        self.assertIn('Instant Client', str(raised.exception))
+        self.assertNotIn('DPI-1047', str(raised.exception))
+        self.assertNotIn('secret', str(raised.exception))
+        driver.connect.assert_not_called()
 
     def test_sid_ref_requires_explicit_sid(self):
         with self.assertRaisesRegex(
@@ -129,6 +254,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'service_name': 'FREEPDB1',
                 'user': 'app',
                 'password': 'secret',
+                'thick': False,
             },
         )
         self.assertEqual(schema, 'SALES')
