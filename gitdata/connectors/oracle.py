@@ -9,9 +9,14 @@ from gitdata.connectors.common import (
     ConnectorError,
     password_from_environment,
 )
-from gitdata.oracle_client import OracleClientError, prepare_oracle_client
+from gitdata.oracle_client import OracleClientError, connect_oracle
 
-_SCHEME_TOKENS = frozenset({'sid', 'thick'})
+_SCHEMES = frozenset({
+    'oracle',
+    'oracle+thick',
+    'oracle+sid',
+    'oracle+sid+thick',
+})
 
 
 class OracleRefError(ConnectorError, ValueError):
@@ -67,17 +72,15 @@ class OracleConnector(BaseConnector):
             raise OracleRefError('Oracle refs require a user and host')
 
         user = unquote(parts.username)
-        tokens = parts.scheme.lower().split('+')
-        if not tokens or tokens[0] != 'oracle':
+        scheme = parts.scheme.lower()
+        if scheme != 'oracle' and not scheme.startswith('oracle+'):
             raise OracleRefError('Oracle refs require an oracle scheme')
-        extras = tokens[1:]
-        unknown = [token for token in extras if token not in _SCHEME_TOKENS]
-        if unknown or len(extras) != len(set(extras)):
+        if scheme not in _SCHEMES:
             raise OracleRefError(
                 'Oracle ref scheme is not supported: {!r}'.format(parts.scheme)
             )
-        sid_ref = 'sid' in extras
-        thick = 'thick' in extras
+        sid_ref = scheme in ('oracle+sid', 'oracle+sid+thick')
+        thick = scheme in ('oracle+thick', 'oracle+sid+thick')
         raw_path = parts.path.lstrip('/')
         raw_components = raw_path.split('/') if raw_path else []
         if len(raw_components) > 3 or not all(raw_components):
@@ -265,14 +268,15 @@ class OracleConnector(BaseConnector):
             ) from None
 
         try:
-            prepare_oracle_client(oracledb, config.get('thick'))
             identifier_key, _, identifier = cls._connect_identifier(config)
             dsn = oracledb.makedsn(
                 config['host'],
                 config['port'],
                 **{identifier_key: identifier}
             )
-            return oracledb.connect(
+            return connect_oracle(
+                oracledb,
+                config.get('thick'),
                 user=config['user'],
                 password=config['password'],
                 dsn=dsn,
