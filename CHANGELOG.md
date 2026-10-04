@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- opt in to Oracle Thick mode with `oracle+thick://` and `oracle+sid+thick://` refs
 
 ## [v0.0.22] - 2026-09-30
 - navigate Oracle connections as visible schemas, tables, and columns using permission-aware `ALL_*` dictionary views

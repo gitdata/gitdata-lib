@@ -1,7 +1,13 @@
 """Oracle Database support via the optional python-oracledb driver."""
 
+from gitdata.oracle_client import (
+    OracleClientError,
+    connect_oracle,
+    prepare_oracle_client,
+)
+
 from ..utils import Bunch
-from .common import Database
+from .common import Database, DatabaseException
 
 
 def _normalize_identifier(name):
@@ -17,6 +23,12 @@ class OracleDatabase(Database):
 
     def __init__(self, *args, **kwargs):
         import oracledb
+
+        thick = kwargs.pop('thick', False)
+        try:
+            prepare_oracle_client(oracledb, thick)
+        except OracleClientError as error:
+            raise DatabaseException(str(error)) from None
 
         host = kwargs.pop('host', None)
         port = kwargs.pop('port', None)
@@ -42,7 +54,12 @@ class OracleDatabase(Database):
 
         self._dsn = kwargs['dsn']
 
-        Database.__init__(self, oracledb.connect, *args, **kwargs)
+        def connection_factory(*factory_args, **factory_kwargs):
+            return connect_oracle(
+                oracledb, thick, *factory_args, **factory_kwargs
+            )
+
+        Database.__init__(self, connection_factory, *args, **kwargs)
 
     def use(self, name):
         """Return a connection wrapper for another Oracle service."""
