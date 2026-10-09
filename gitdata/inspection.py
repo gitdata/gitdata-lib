@@ -2,6 +2,10 @@
 
 from datetime import date, datetime
 from decimal import Decimal
+import os
+import re
+import sqlite3
+import tempfile
 
 
 TYPE_NAMES = {
@@ -15,6 +19,125 @@ TYPE_NAMES = {
     date: 'date',
     datetime: 'datetime',
 }
+
+
+INTEGER_TEXT = re.compile(r'^[+-]?(?:0|[1-9][0-9]*)$')
+DECIMAL_TEXT = re.compile(
+    r'^[+-]?(?:'
+    r'(?:0|[1-9][0-9]*)\.[0-9]*'
+    r'|\.[0-9]+'
+    r'|(?:0|[1-9][0-9]*)[eE][+-]?[0-9]+'
+    r'|(?:0|[1-9][0-9]*)\.[0-9]*[eE][+-]?[0-9]+'
+    r'|\.[0-9]+[eE][+-]?[0-9]+'
+    r')$'
+)
+
+
+def _csv_value_type(value):
+    lowered = value.lower()
+    if lowered in ('true', 'false'):
+        return 'boolean'
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError:
+        pass
+    else:
+        if parsed.isoformat() == value:
+            return 'date'
+    if 'T' in value or ' ' in value:
+        try:
+            datetime.fromisoformat(value)
+        except ValueError:
+            pass
+        else:
+            return 'datetime'
+    if INTEGER_TEXT.match(value):
+        return 'integer'
+    return 'decimal' if DECIMAL_TEXT.match(value) else 'string'
+
+
+def _csv_data_type(types):
+    if not types:
+        return '-'
+    if types <= {'integer', 'decimal'}:
+        return 'decimal' if 'decimal' in types else 'integer'
+    if types <= {'date', 'datetime'}:
+        return 'datetime' if 'datetime' in types else 'date'
+    if len(types) == 1:
+        return next(iter(types))
+    return 'mixed'
+
+
+def _csv_column_summaries(table):
+    profiles = [
+        {
+            'types': set(),
+            'empty': 0,
+            'width': 0,
+            'example': None,
+        }
+        for _ in table['columns']
+    ]
+    row_count = 0
+    rows = iter(table['rows'])
+    with tempfile.TemporaryDirectory(prefix='gitdata-csv-profile-') as directory:
+        pathname = os.path.join(directory, 'distinct.sqlite')
+        database = sqlite3.connect(pathname)
+        try:
+            database.execute('PRAGMA journal_mode=OFF')
+            database.execute('PRAGMA synchronous=OFF')
+            database.execute(
+                'CREATE TABLE distinct_values ('
+                'column_index INTEGER NOT NULL, '
+                'value TEXT NOT NULL, '
+                'PRIMARY KEY (column_index, value)'
+                ') WITHOUT ROWID'
+            )
+            for row in rows:
+                row_count += 1
+                for index, value in enumerate(row):
+                    text = value.strip()
+                    profile = profiles[index]
+                    profile['width'] = max(profile['width'], len(value))
+                    if not text:
+                        profile['empty'] += 1
+                        continue
+                    profile['types'].add(_csv_value_type(text))
+                    database.execute(
+                        'INSERT OR IGNORE INTO distinct_values '
+                        '(column_index, value) VALUES (?, ?)',
+                        (index, value),
+                    )
+                    if profile['example'] is None:
+                        profile['example'] = value
+            distinct_counts = dict(database.execute(
+                'SELECT column_index, COUNT(*) FROM distinct_values '
+                'GROUP BY column_index'
+            ))
+        finally:
+            database.close()
+            close = getattr(rows, 'close', None)
+            if close is not None:
+                close()
+
+    return [
+        {
+            'name': name,
+            'type': 'column',
+            'data_type': _csv_data_type(profile['types']),
+            'empty': profile['empty'],
+            'distinct': distinct_counts.get(index, 0),
+            'candidate_key': (
+                'YES'
+                if row_count and not profile['empty']
+                and distinct_counts.get(index, 0) == row_count
+                else 'NO'
+            ),
+            'width': profile['width'],
+            'example': profile['example'] or '-',
+        }
+        for index, (name, profile) in enumerate(zip(table['columns'], profiles))
+    ]
 
 
 def list_items(root, verbose=False, show_all=False):
@@ -35,6 +158,8 @@ def list_items(root, verbose=False, show_all=False):
     if root.get('type') == 'column':
         return []
     if root.get('type') == 'table':
+        if verbose and root.get('format') == 'csv':
+            return _csv_column_summaries(root)
         if verbose and 'column_summaries' in root:
             return list(root['column_summaries'])
         return [

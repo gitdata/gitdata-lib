@@ -653,6 +653,164 @@ class DirectInspectionTests(unittest.TestCase):
             },
         ])
 
+    def test_csv_verbose_listing_infers_column_metadata(self):
+        pathname = self.write_csv(
+            'customers.csv',
+            'customer_id,name,joined,discount,active\n'
+            '1001,Ada Lovelace,2026-01-03,12.50,true\n'
+            '1002,Grace Hopper,2026-01-04,,true\n'
+            '1003,Linus Torvalds,2026-02-12,5.00,false\n'
+            '1004,,2026-02-12,5.00,true\n',
+        )
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items, [
+            {
+                'name': 'customer_id',
+                'type': 'column',
+                'data_type': 'integer',
+                'empty': 0,
+                'distinct': 4,
+                'candidate_key': 'YES',
+                'width': 4,
+                'example': '1001',
+            },
+            {
+                'name': 'name',
+                'type': 'column',
+                'data_type': 'string',
+                'empty': 1,
+                'distinct': 3,
+                'candidate_key': 'NO',
+                'width': 14,
+                'example': 'Ada Lovelace',
+            },
+            {
+                'name': 'joined',
+                'type': 'column',
+                'data_type': 'date',
+                'empty': 0,
+                'distinct': 3,
+                'candidate_key': 'NO',
+                'width': 10,
+                'example': '2026-01-03',
+            },
+            {
+                'name': 'discount',
+                'type': 'column',
+                'data_type': 'decimal',
+                'empty': 1,
+                'distinct': 2,
+                'candidate_key': 'NO',
+                'width': 5,
+                'example': '12.50',
+            },
+            {
+                'name': 'active',
+                'type': 'column',
+                'data_type': 'boolean',
+                'empty': 0,
+                'distinct': 2,
+                'candidate_key': 'NO',
+                'width': 5,
+                'example': 'true',
+            },
+        ])
+
+    def test_csv_verbose_listing_preserves_zero_padded_identifiers(self):
+        pathname = self.write_csv(
+            'codes.csv',
+            'code,notes\n001,\n002,   \n',
+        )
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['data_type'], 'string')
+        self.assertEqual(items[0]['candidate_key'], 'YES')
+        self.assertEqual(items[0]['width'], 3)
+        self.assertEqual(items[1], {
+            'name': 'notes',
+            'type': 'column',
+            'data_type': '-',
+            'empty': 2,
+            'distinct': 0,
+            'candidate_key': 'NO',
+            'width': 3,
+            'example': '-',
+        })
+
+    def test_csv_verbose_listing_uses_conservative_decimal_syntax(self):
+        pathname = self.write_csv(
+            'identifiers.csv',
+            'value\n1__0.0\n１２.５\nNaN.0\n',
+        )
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['data_type'], 'string')
+
+    def test_csv_verbose_listing_preserves_source_whitespace_metadata(self):
+        pathname = self.write_csv(
+            'whitespace.csv',
+            'value,empty\n" A ","   "\nA,\n',
+        )
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['empty'], 0)
+        self.assertEqual(items[0]['distinct'], 2)
+        self.assertEqual(items[0]['candidate_key'], 'YES')
+        self.assertEqual(items[0]['width'], 3)
+        self.assertEqual(items[0]['example'], ' A ')
+        self.assertEqual(items[1]['empty'], 2)
+        self.assertEqual(items[1]['distinct'], 0)
+        self.assertEqual(items[1]['width'], 3)
+
+    def test_csv_verbose_listing_scans_past_scan_sample_limit(self):
+        rows = ['id,value']
+        rows.extend('{},short'.format(index) for index in range(100001))
+        rows.append('0,a much wider duplicate')
+        pathname = self.write_csv('complete.csv', '\n'.join(rows) + '\n')
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['distinct'], 100001)
+        self.assertEqual(items[0]['candidate_key'], 'NO')
+        self.assertEqual(items[1]['width'], 22)
+
+    def test_csv_verbose_listing_infers_numeric_and_temporal_families(self):
+        pathname = self.write_csv(
+            'families.csv',
+            'number,temporal\n1,2026-01-03\n1.5,2026-01-03T12:30:00\n',
+        )
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['data_type'], 'decimal')
+        self.assertEqual(items[1]['data_type'], 'datetime')
+
+    def test_csv_verbose_listing_reports_incompatible_types_as_mixed(self):
+        pathname = self.write_csv(
+            'mixed.csv',
+            'value\n1\nnot-a-number\n',
+        )
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['data_type'], 'mixed')
+
+    def test_csv_verbose_listing_does_not_infer_keys_without_rows(self):
+        pathname = self.write_csv('header-only.csv', 'id,name\n')
+
+        items = list_items(fetch(pathname), verbose=True)
+
+        self.assertEqual(items[0]['data_type'], '-')
+        self.assertEqual(items[0]['empty'], 0)
+        self.assertEqual(items[0]['distinct'], 0)
+        self.assertEqual(items[0]['candidate_key'], 'NO')
+        self.assertEqual(items[0]['width'], 0)
+
     def test_csv_duplicate_column_names_do_not_collapse_values(self):
         pathname = self.write_csv(
             'duplicate-columns.csv',
@@ -875,6 +1033,42 @@ class DirectInspectionTests(unittest.TestCase):
         output = self.run_cli('ls', pathname)
 
         self.assertEqual(output, 'id\nname\n')
+
+    def test_ls_verbose_uses_inferred_csv_metadata_layout(self):
+        pathname = self.write_csv(
+            'customers.csv',
+            'customer_id,name\n1001,Ada\n1002,Grace\n',
+        )
+
+        output = self.run_cli('ls', '-l', pathname)
+
+        lines = output.splitlines()
+        self.assertEqual(
+            lines[0],
+            '{} {} {} {} {} {} {}'.format(
+                'Column'.ljust(20),
+                'Type'.ljust(10),
+                'Empty'.rjust(8),
+                'Distinct'.rjust(10),
+                'Candidate Key'.ljust(13),
+                'Width'.rjust(7),
+                'Example'.ljust(20),
+            ).rstrip(),
+        )
+        self.assertEqual(
+            lines[2],
+            '{} {} {} {} {} {} {}'.format(
+                'customer_id'.ljust(20),
+                'integer'.ljust(10),
+                '0'.rjust(8),
+                '2'.rjust(10),
+                'YES'.ljust(13),
+                '4'.rjust(7),
+                '1001'.ljust(20),
+            ).rstrip(),
+        )
+        self.assertNotIn('Default', output)
+        self.assertNotIn('Extra', output)
 
     def test_ls_all_includes_sqlite_system_tables(self):
         pathname = os.path.join(self.tempdir.name, 'system.sqlite')
