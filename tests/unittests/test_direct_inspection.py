@@ -377,6 +377,25 @@ class DirectInspectionTests(unittest.TestCase):
 
         self.assertIn('Database', output)
         self.assertRegex(output, r'cocal\s+3\s+42\s+7')
+        lines = output.splitlines()
+        self.assertEqual(
+            lines[0],
+            '{} {} {} {}'.format(
+                'Database'.ljust(35),
+                'Tables'.rjust(10),
+                'Rows'.rjust(15),
+                'Size (MB)'.rjust(10),
+            ),
+        )
+        self.assertEqual(
+            lines[2],
+            '{} {} {} {}'.format(
+                'cocal'.ljust(35),
+                '3'.rjust(10),
+                '42'.rjust(15),
+                '7'.rjust(10),
+            ),
+        )
         stats_cursor.execute.assert_called_once()
         stats_sql = stats_cursor.execute.call_args[0][0].lower()
         self.assertIn("t.table_type='base table'", stats_sql)
@@ -889,6 +908,42 @@ class DirectInspectionTests(unittest.TestCase):
         self.assertIn('Rows', output)
         self.assertIn('Size (MB)', output)
         self.assertRegex(output, r'customers\s+2\s+2\s+0')
+
+    def test_ls_verbose_right_aligns_numeric_columns(self):
+        root = {
+            'type': 'database',
+            'table_summaries': ({
+                'name': 'customers',
+                'type': 'table',
+                'columns': 5,
+                'rows': 23,
+                'size': 2,
+            },),
+        }
+        with patch(
+                'gitdata.cli.gitdata_ls.fetch',
+                return_value=root):
+            output = self.run_cli('ls', '-l', 'example.sqlite')
+
+        lines = output.splitlines()
+        self.assertEqual(
+            lines[0],
+            '{} {} {} {}'.format(
+                'Table'.ljust(35),
+                'Columns'.rjust(10),
+                'Rows'.rjust(15),
+                'Size (MB)'.rjust(10),
+            ),
+        )
+        self.assertEqual(
+            lines[2],
+            '{} {} {} {}'.format(
+                'customers'.ljust(35),
+                '5'.rjust(10),
+                '23'.rjust(15),
+                '2'.rjust(10),
+            ),
+        )
 
     def test_ls_verbose_describes_sqlite_columns_and_indexes(self):
         pathname = os.path.join(self.tempdir.name, 'schema.sqlite')

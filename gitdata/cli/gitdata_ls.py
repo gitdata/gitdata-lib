@@ -31,6 +31,9 @@ _LAYOUTS = {
 }
 
 
+_NUMERIC_KEYS = frozenset(('tables', 'columns', 'rows', 'size'))
+
+
 def _display(value):
     if value is None:
         return '-'
@@ -39,10 +42,14 @@ def _display(value):
     return terminal_text(value)
 
 
-def _row(values, widths):
+def _row(values, widths, right_aligned=()):
     return ' '.join(
-        _display(value).ljust(width)
-        for value, width in zip(values, widths)
+        (
+            _display(value).rjust(width)
+            if index in right_aligned
+            else _display(value).ljust(width)
+        )
+        for index, (value, width) in enumerate(zip(values, widths))
     ).rstrip()
 
 
@@ -52,10 +59,17 @@ def _print_verbose(root, items):
     )
     if root.get('item_label'):
         labels = (root['item_label'],) + labels[1:]
-    print(_row(labels, widths))
-    print(_row(('-' * width for width in widths), widths))
+    numeric_columns = frozenset(
+        index for index, key in enumerate(keys) if key in _NUMERIC_KEYS
+    )
+    print(_row(labels, widths, numeric_columns))
+    print(_row(('-' * width for width in widths), widths, numeric_columns))
     for item in items:
-        print(_row((item.get(key, '-') for key in keys), widths))
+        print(_row(
+            (item.get(key, '-') for key in keys),
+            widths,
+            numeric_columns,
+        ))
 
     indexes = list(root.get('indexes', ()))
     if indexes:
