@@ -33,11 +33,22 @@ to choose how many rows to preview.
 
 ## CSV
 
-List the columns in a CSV file:
+List the columns in a CSV file, or use a long listing to infer useful
+metadata from all of its rows:
 
 ```bash
 gitdata ls examples/locations-headered.csv
+gitdata ls -l examples/locations-headered.csv
 ```
+
+The long listing reads every row and reports inferred types, whitespace-only
+empty counts, exact distinct non-empty source values, source-field widths,
+examples, and single-column candidate keys. Candidate keys are inferred when
+every row has a non-empty, unique source value; they are not declared schema.
+Because it is exact, the long listing uses a temporary disk-backed index and
+can take longer than ordinary `ls` for large files. `gitdata scan` remains a
+bounded, raw-value profile: its types and cardinality describe the sampled
+values and may therefore differ from these semantic, complete-file inferences.
 
 Preview its rows:
 

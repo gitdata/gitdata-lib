@@ -28,10 +28,23 @@ _LAYOUTS = {
         ('name', 'data_type', 'null', 'key', 'default', 'extra'),
         (24, 20, 5, 5, 22, 16),
     ),
+    'csv': (
+        (
+            'Column', 'Type', 'Empty', 'Distinct',
+            'Candidate Key', 'Width', 'Example',
+        ),
+        (
+            'name', 'data_type', 'empty', 'distinct',
+            'candidate_key', 'width', 'example',
+        ),
+        (20, 10, 8, 10, 13, 7, 20),
+    ),
 }
 
 
-_NUMERIC_KEYS = frozenset(('tables', 'columns', 'rows', 'size'))
+_NUMERIC_KEYS = frozenset((
+    'tables', 'columns', 'rows', 'size', 'empty', 'distinct', 'width',
+))
 
 
 def _display(value):
@@ -54,8 +67,9 @@ def _row(values, widths, right_aligned=()):
 
 
 def _print_verbose(root, items):
+    layout = root.get('format', root['type'])
     labels, keys, widths = _LAYOUTS.get(
-        root['type'], (('Name', 'Type'), ('name', 'type'), (35, 12))
+        layout, (('Name', 'Type'), ('name', 'type'), (35, 12))
     )
     if root.get('item_label'):
         labels = (root['item_label'],) + labels[1:]

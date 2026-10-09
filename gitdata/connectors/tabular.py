@@ -49,6 +49,7 @@ class CsvConnector(BaseConnector):
 
         return {
             'type': 'table',
+            'format': 'csv',
             'name': os.path.basename(ref),
             'columns': columns,
             'rows': rows(),
