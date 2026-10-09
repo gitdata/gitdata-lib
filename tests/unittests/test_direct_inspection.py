@@ -1050,7 +1050,7 @@ class DirectInspectionTests(unittest.TestCase):
                 'Type'.ljust(10),
                 'Empty'.rjust(8),
                 'Distinct'.rjust(10),
-                'Candidate Key'.ljust(13),
+                'Candidate Key?'.ljust(14),
                 'Width'.rjust(7),
                 'Example'.ljust(20),
             ).rstrip(),
@@ -1062,13 +1062,29 @@ class DirectInspectionTests(unittest.TestCase):
                 'integer'.ljust(10),
                 '0'.rjust(8),
                 '2'.rjust(10),
-                'YES'.ljust(13),
+                'YES'.ljust(14),
                 '4'.rjust(7),
                 '1001'.ljust(20),
             ).rstrip(),
         )
         self.assertNotIn('Default', output)
         self.assertNotIn('Extra', output)
+
+    def test_ls_verbose_truncates_csv_examples_to_the_column_width(self):
+        pathname = self.write_csv(
+            'long-example.csv',
+            'id,description\n1,abcdefghijklmnopqrstuvwxyz\n',
+        )
+
+        output = self.run_cli('ls', '-l', pathname)
+
+        lines = output.splitlines()
+        self.assertIn('Candidate Key?', lines[0])
+        self.assertTrue(lines[0].endswith('Example'))
+        self.assertTrue(lines[1].endswith('-' * 20))
+        self.assertTrue(lines[3].endswith('abcdefghijklmnopq...'))
+        self.assertEqual(len(lines[1]), len(lines[3]))
+        self.assertNotIn('rstuvwxyz', output)
 
     def test_ls_all_includes_sqlite_system_tables(self):
         pathname = os.path.join(self.tempdir.name, 'system.sqlite')

@@ -31,13 +31,13 @@ _LAYOUTS = {
     'csv': (
         (
             'Column', 'Type', 'Empty', 'Distinct',
-            'Candidate Key', 'Width', 'Example',
+            'Candidate Key?', 'Width', 'Example',
         ),
         (
             'name', 'data_type', 'empty', 'distinct',
             'candidate_key', 'width', 'example',
         ),
-        (20, 10, 8, 10, 13, 7, 20),
+        (20, 10, 8, 10, 14, 7, 20),
     ),
 }
 
@@ -55,12 +55,19 @@ def _display(value):
     return terminal_text(value)
 
 
-def _row(values, widths, right_aligned=()):
+def _fit(value, width, truncate=False):
+    text = _display(value)
+    if truncate and len(text) > width:
+        return text[:width - 3] + '...'
+    return text
+
+
+def _row(values, widths, right_aligned=(), truncated=()):
     return ' '.join(
         (
-            _display(value).rjust(width)
+            _fit(value, width, index in truncated).rjust(width)
             if index in right_aligned
-            else _display(value).ljust(width)
+            else _fit(value, width, index in truncated).ljust(width)
         )
         for index, (value, width) in enumerate(zip(values, widths))
     ).rstrip()
@@ -76,6 +83,9 @@ def _print_verbose(root, items):
     numeric_columns = frozenset(
         index for index, key in enumerate(keys) if key in _NUMERIC_KEYS
     )
+    truncated_columns = frozenset(
+        index for index, key in enumerate(keys) if key == 'example'
+    )
     print(_row(labels, widths, numeric_columns))
     print(_row(('-' * width for width in widths), widths, numeric_columns))
     for item in items:
@@ -83,6 +93,7 @@ def _print_verbose(root, items):
             (item.get(key, '-') for key in keys),
             widths,
             numeric_columns,
+            truncated_columns,
         ))
 
     indexes = list(root.get('indexes', ()))
