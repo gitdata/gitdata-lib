@@ -31,13 +31,13 @@ _LAYOUTS = {
     'csv': (
         (
             'Column', 'Type', 'Empty', 'Distinct',
-            'Candidate Key?', 'Width', 'Example',
+            'Key?', 'Width', 'Example',
         ),
         (
             'name', 'data_type', 'empty', 'distinct',
             'candidate_key', 'width', 'example',
         ),
-        (20, 10, 8, 10, 14, 7, 20),
+        (20, 10, 8, 10, 5, 7, 20),
     ),
 }
 

@@ -1050,7 +1050,7 @@ class DirectInspectionTests(unittest.TestCase):
                 'Type'.ljust(10),
                 'Empty'.rjust(8),
                 'Distinct'.rjust(10),
-                'Candidate Key?'.ljust(14),
+                'Key?'.ljust(5),
                 'Width'.rjust(7),
                 'Example'.ljust(20),
             ).rstrip(),
@@ -1062,7 +1062,7 @@ class DirectInspectionTests(unittest.TestCase):
                 'integer'.ljust(10),
                 '0'.rjust(8),
                 '2'.rjust(10),
-                'YES'.ljust(14),
+                'YES'.ljust(5),
                 '4'.rjust(7),
                 '1001'.ljust(20),
             ).rstrip(),
@@ -1079,7 +1079,8 @@ class DirectInspectionTests(unittest.TestCase):
         output = self.run_cli('ls', '-l', pathname)
 
         lines = output.splitlines()
-        self.assertIn('Candidate Key?', lines[0])
+        self.assertIn('Key?', lines[0])
+        self.assertNotIn('Candidate', lines[0])
         self.assertTrue(lines[0].endswith('Example'))
         self.assertTrue(lines[1].endswith('-' * 20))
         self.assertTrue(lines[3].endswith('abcdefghijklmnopq...'))
