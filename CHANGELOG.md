@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- right-align numeric columns in `gitdata ls -l` output
 
 ## [v0.0.23] - 2026-10-03
 - opt in to Oracle Thick mode with `oracle+thick://` and `oracle+sid+thick://` refs
