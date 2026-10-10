@@ -80,6 +80,16 @@ def _print_verbose(root, items):
     )
     if root.get('item_label'):
         labels = (root['item_label'],) + labels[1:]
+    if layout == 'csv':
+        column_width = max(
+            widths[0],
+            len(_display(labels[0])),
+            max(
+                (len(_display(item.get(keys[0], '-'))) for item in items),
+                default=0,
+            ),
+        )
+        widths = (column_width,) + widths[1:]
     numeric_columns = frozenset(
         index for index, key in enumerate(keys) if key in _NUMERIC_KEYS
     )

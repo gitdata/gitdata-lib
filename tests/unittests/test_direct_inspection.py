@@ -1087,6 +1087,27 @@ class DirectInspectionTests(unittest.TestCase):
         self.assertEqual(len(lines[1]), len(lines[3]))
         self.assertNotIn('rstuvwxyz', output)
 
+    def test_ls_verbose_expands_csv_column_name_width(self):
+        column_name = 'primary_responsibility_organization'
+        pathname = self.write_csv(
+            'wide-column-name.csv',
+            '{},value\nFinance Reporting,1\n'.format(column_name),
+        )
+
+        output = self.run_cli('ls', '-l', pathname)
+
+        lines = output.splitlines()
+        expected_width = len(column_name)
+        self.assertTrue(lines[0].startswith(
+            '{} {}'.format('Column'.ljust(expected_width), 'Type')
+        ))
+        self.assertTrue(lines[1].startswith(
+            '{} {}'.format('-' * expected_width, '-' * 10)
+        ))
+        self.assertTrue(lines[2].startswith(
+            '{} {}'.format(column_name, 'string')
+        ))
+
     def test_ls_all_includes_sqlite_system_tables(self):
         pathname = os.path.join(self.tempdir.name, 'system.sqlite')
         with sqlite3.connect(pathname) as database:
