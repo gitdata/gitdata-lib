@@ -17,6 +17,22 @@ from gitdata.connectors.common import (
 )
 
 
+def _csv_encoding(ref):
+    for encoding in ('utf-8-sig', 'cp1252'):
+        try:
+            with open(ref, 'r', encoding=encoding) as source:
+                while source.read(65536):
+                    pass
+        except UnicodeDecodeError:
+            continue
+        return encoding
+    raise ConnectorError(
+        "CSV file {!r} is not valid UTF-8 or Windows-1252".format(
+            os.path.basename(ref)
+        )
+    )
+
+
 class CsvConnector(BaseConnector):
     """Resolve a local CSV file into one table root."""
 
@@ -31,11 +47,12 @@ class CsvConnector(BaseConnector):
         if not self.accepts(ref):
             return None
 
-        with open(ref, 'r', encoding='utf-8-sig', newline='') as source:
+        encoding = _csv_encoding(ref)
+        with open(ref, 'r', encoding=encoding, newline='') as source:
             columns = tuple(next(csv.reader(source), ()))
 
         def rows():
-            with open(ref, 'r', encoding='utf-8-sig', newline='') as source:
+            with open(ref, 'r', encoding=encoding, newline='') as source:
                 reader = csv.reader(source)
                 next(reader, None)
                 for row_number, row in enumerate(reader, start=2):

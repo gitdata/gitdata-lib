@@ -41,6 +41,10 @@ gitdata ls examples/locations-headered.csv
 gitdata ls -l examples/locations-headered.csv
 ```
 
+CSV input is decoded as UTF-8 (including UTF-8 with a BOM) when possible, with
+a Windows-1252 fallback for legacy files. Files that match neither encoding
+produce a concise error instead of a Python traceback.
+
 The long listing reads every row and reports inferred types, whitespace-only
 empty counts, exact distinct non-empty source values, source-field widths,
 examples, and single-column candidate keys. Candidate keys are inferred when
