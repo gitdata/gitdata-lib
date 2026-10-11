@@ -5,6 +5,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import unicodedata
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -21,6 +22,15 @@ from gitdata.connectors.tabular import (
     SQLiteConnector,
 )
 from gitdata.inspection import list_items, scan
+
+
+def rendered_width(text):
+    return sum(
+        0 if unicodedata.combining(character)
+        else 2 if unicodedata.east_asian_width(character) in ('F', 'W')
+        else 1
+        for character in text
+    )
 
 
 class DirectInspectionTests(unittest.TestCase):
@@ -340,7 +350,7 @@ class DirectInspectionTests(unittest.TestCase):
                 return_value=connection) as connect:
             output = self.run_cli('ls', 'mysql://root@127.0.0.1')
 
-        self.assertEqual(output, 'gitdata_example\n')
+        self.assertEqual(output, 'gitdata_example\n1 database\n')
         connect.assert_called_once_with(
             host='127.0.0.1',
             port=3306,
@@ -365,7 +375,10 @@ class DirectInspectionTests(unittest.TestCase):
                 return_value=connection):
             output = self.run_cli('ls', '-a', 'mysql://root@127.0.0.1')
 
-        self.assertEqual(output, 'gitdata_example\nperformance_schema\n')
+        self.assertEqual(
+            output,
+            'gitdata_example\nperformance_schema\n2 databases\n',
+        )
 
     def test_mysql_server_verbose_lists_database_stats(self):
         names_connection = MagicMock()
@@ -1136,7 +1149,43 @@ class DirectInspectionTests(unittest.TestCase):
 
         output = self.run_cli('ls', pathname)
 
-        self.assertEqual(output, 'id\nname\n')
+        self.assertEqual(output, 'id\nname\n2 columns\n')
+
+    def test_ls_counts_empty_and_singular_listing_levels(self):
+        cases = (
+            (
+                {'type': 'server', 'database_names': ()},
+                '0 databases\n',
+            ),
+            (
+                {'type': 'database', 'table_names': ()},
+                '0 tables\n',
+            ),
+            (
+                {'type': 'table', 'columns': (), 'rows': iter(())},
+                '0 columns\n',
+            ),
+            (
+                {'type': 'table', 'columns': ('id',), 'rows': iter(())},
+                'id\n1 column\n',
+            ),
+            (
+                {
+                    'type': 'server',
+                    'item_label': 'Schema',
+                    'database_names': ('APP',),
+                },
+                'APP\n1 schema\n',
+            ),
+        )
+
+        for root, expected in cases:
+            with self.subTest(root=root):
+                with patch(
+                        'gitdata.cli.gitdata_ls.fetch',
+                        return_value=root):
+                    output = self.run_cli('ls', 'example')
+                self.assertEqual(output, expected)
 
     def test_ls_verbose_uses_inferred_csv_metadata_layout(self):
         pathname = self.write_csv(
@@ -1173,23 +1222,64 @@ class DirectInspectionTests(unittest.TestCase):
         )
         self.assertNotIn('Default', output)
         self.assertNotIn('Extra', output)
+        self.assertEqual(lines[-1], '2 columns')
 
-    def test_ls_verbose_truncates_csv_examples_to_the_column_width(self):
+    def test_ls_verbose_expands_csv_examples_when_the_terminal_has_room(self):
         pathname = self.write_csv(
             'long-example.csv',
             'id,description\n1,abcdefghijklmnopqrstuvwxyz\n',
         )
 
-        output = self.run_cli('ls', '-l', pathname)
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((120, 24))):
+            output = self.run_cli('ls', '-l', pathname)
 
         lines = output.splitlines()
         self.assertIn('Key?', lines[0])
         self.assertNotIn('Candidate', lines[0])
         self.assertTrue(lines[0].endswith('Example'))
-        self.assertTrue(lines[1].endswith('-' * 20))
-        self.assertTrue(lines[3].endswith('abcdefghijklmnopq...'))
-        self.assertEqual(len(lines[1]), len(lines[3]))
-        self.assertNotIn('rstuvwxyz', output)
+        self.assertTrue(lines[1].endswith('-' * 26))
+        self.assertTrue(lines[3].endswith('abcdefghijklmnopqrstuvwxyz'))
+        self.assertNotIn('...', output)
+        self.assertLess(len(lines[1]), 120)
+
+    def test_ls_verbose_truncates_to_avoid_terminal_line_wrapping(self):
+        column_name = 'primary_responsibility_organization'
+        pathname = self.write_csv(
+            'narrow.csv',
+            '{},description\nFinance Reporting,abcdefghijklmnopqrstuvwxyz\n'.format(
+                column_name
+            ),
+        )
+
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((70, 24))):
+            output = self.run_cli('ls', '-l', pathname)
+
+        lines = output.splitlines()
+        self.assertTrue(all(len(line) <= 70 for line in lines))
+        self.assertIn('...', output)
+
+    def test_ls_output_does_not_wrap_on_an_extremely_narrow_terminal(self):
+        pathname = self.write_csv(
+            'tiny-terminal.csv',
+            'identifier,description\n1,abcdefghijklmnopqrstuvwxyz\n',
+        )
+
+        for width in range(1, 9):
+            for long_option in ((), ('-l',)):
+                with self.subTest(width=width, long=bool(long_option)), patch(
+                        'shutil.get_terminal_size',
+                        return_value=os.terminal_size((width, 24))):
+                    output = self.run_cli('ls', *long_option, pathname)
+
+                self.assertTrue(all(
+                    rendered_width(line) <= width
+                    and line == line.rstrip()
+                    for line in output.splitlines()
+                ))
 
     def test_ls_verbose_expands_csv_column_name_width(self):
         column_name = 'primary_responsibility_organization'
@@ -1223,8 +1313,11 @@ class DirectInspectionTests(unittest.TestCase):
         ordinary = self.run_cli('ls', pathname)
         all_items = self.run_cli('ls', '-a', pathname)
 
-        self.assertEqual(ordinary, 'items\n')
-        self.assertEqual(all_items, 'items\nsqlite_sequence\n')
+        self.assertEqual(ordinary, 'items\n1 table\n')
+        self.assertEqual(
+            all_items,
+            'items\nsqlite_sequence\n2 tables\n',
+        )
 
     def test_ls_verbose_describes_sqlite_tables(self):
         pathname = os.path.join(self.tempdir.name, 'verbose.sqlite')
@@ -1299,6 +1392,66 @@ class DirectInspectionTests(unittest.TestCase):
         self.assertRegex(output, r'name\s+TEXT\s+NO\s+-\s+"unknown"')
         self.assertIn('Index', output)
         self.assertRegex(output, r'customers_name\s+YES\s+name')
+
+    def test_ls_verbose_table_and_index_layouts_do_not_wrap(self):
+        pathname = os.path.join(self.tempdir.name, 'narrow-schema.sqlite')
+        with sqlite3.connect(pathname) as database:
+            database.execute(
+                'create table customers_with_a_long_name ('
+                'identifier_with_a_long_name integer primary key, '
+                'description_with_a_long_name text not null '
+                'default "a long default value")'
+            )
+            database.execute(
+                'create unique index customers_description_with_a_long_name '
+                'on customers_with_a_long_name '
+                '(description_with_a_long_name)'
+            )
+
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((60, 24))):
+            output = self.run_cli(
+                'ls', '-l', pathname + '/customers_with_a_long_name'
+            )
+
+        self.assertTrue(all(len(line) <= 60 for line in output.splitlines()))
+        self.assertIn('...', output)
+        self.assertEqual(output.splitlines()[-1], '2 columns')
+
+    def test_ls_short_listing_does_not_wrap_long_names(self):
+        root = {
+            'type': 'database',
+            'table_names': ('a_table_name_that_is_too_long',),
+        }
+        with patch(
+                'gitdata.cli.gitdata_ls.fetch',
+                return_value=root):
+            with patch(
+                    'shutil.get_terminal_size',
+                    return_value=os.terminal_size((20, 24))):
+                output = self.run_cli('ls', 'example.sqlite')
+
+        self.assertEqual(output, 'a_table_name_that...\n1 table\n')
+        self.assertTrue(all(len(line) <= 20 for line in output.splitlines()))
+
+    def test_ls_short_listing_measures_terminal_display_width(self):
+        root = {
+            'type': 'database',
+            'table_names': ('\u6570\u636e\u5e93\u8868\u683c\u540d\u79f0',),
+        }
+        with patch(
+                'gitdata.cli.gitdata_ls.fetch',
+                return_value=root):
+            with patch(
+                    'shutil.get_terminal_size',
+                    return_value=os.terminal_size((10, 24))):
+                output = self.run_cli('ls', 'example.sqlite')
+
+        self.assertTrue(
+            all(rendered_width(line) <= 10 for line in output.splitlines())
+        )
+        self.assertIn('...', output)
 
     def test_ls_verbose_describes_sqlite_expression_indexes(self):
         pathname = os.path.join(self.tempdir.name, 'expression.sqlite')
@@ -1462,9 +1615,12 @@ class DirectInspectionTests(unittest.TestCase):
         )
         self.assertIn(
             '------------------------------ ------------ ----------- '
-            '-------- ----------------------------------',
+            '-------- --------------------',
             output,
         )
+        table_lines = output.splitlines()[1:]
+        self.assertEqual(len(output.splitlines()[2]), 85)
+        self.assertTrue(all(len(line) < 100 for line in table_lines))
         self.assertIn(
             'id                             string                ~2        1 '
             '1, 2',
@@ -1474,6 +1630,70 @@ class DirectInspectionTests(unittest.TestCase):
             'name                           string                ~2        5 '
             'Ada, Grace',
             output,
+        )
+
+    def test_scan_layout_does_not_wrap_on_a_narrow_terminal(self):
+        pathname = self.write_csv(
+            'narrow-scan.csv',
+            'identifier,description\n'
+            '1,abcdefghijklmnopqrstuvwxyz\n'
+            '2,another-long-observed-value\n',
+        )
+
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((60, 24))):
+            output = self.run_cli('scan', pathname)
+
+        self.assertTrue(all(len(line) <= 60 for line in output.splitlines()))
+        self.assertIn('...', output)
+
+    def test_scan_preserves_observed_values_when_the_terminal_has_room(self):
+        pathname = self.write_csv(
+            'wide-scan.csv',
+            'description\nabcdefghijklmnopqrstuvwxyz\n',
+        )
+
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((160, 24))):
+            output = self.run_cli('scan', pathname)
+
+        self.assertIn('abcdefghijklmnopqrstuvwxyz', output)
+        self.assertNotIn('abcdefghijkl...', output)
+        self.assertTrue(all(len(line) < 160 for line in output.splitlines()))
+
+    def test_scan_does_not_wrap_on_an_extremely_narrow_terminal(self):
+        pathname = self.write_csv(
+            'tiny-scan.csv',
+            'identifier,description\n1,abcdefghijklmnopqrstuvwxyz\n',
+        )
+
+        for width in range(1, 9):
+            with self.subTest(width=width), patch(
+                    'shutil.get_terminal_size',
+                    return_value=os.terminal_size((width, 24))):
+                output = self.run_cli('scan', pathname)
+
+            self.assertTrue(all(
+                rendered_width(line) <= width
+                and line == line.rstrip()
+                for line in output.splitlines()
+            ))
+
+    def test_scan_measures_terminal_display_width(self):
+        pathname = self.write_csv(
+            '\u6570\u636e.csv',
+            '\u5217\u540d\n\u6570\u636e\u5e93\u8868\u683c\u540d\u79f0\n',
+        )
+
+        with patch(
+                'shutil.get_terminal_size',
+                return_value=os.terminal_size((20, 24))):
+            output = self.run_cli('scan', pathname)
+
+        self.assertTrue(
+            all(rendered_width(line) <= 20 for line in output.splitlines())
         )
 
     def test_scan_no_count_skips_the_sqlite_eager_count(self):
