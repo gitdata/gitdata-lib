@@ -41,6 +41,12 @@ class DirectInspectionTests(unittest.TestCase):
             output.write(text)
         return pathname
 
+    def write_csv_bytes(self, name, content):
+        pathname = os.path.join(self.tempdir.name, name)
+        with open(pathname, 'wb') as output:
+            output.write(content)
+        return pathname
+
     def run_cli(self, *arguments):
         output = StringIO()
         with patch.object(sys, 'argv', ['gitdata'] + list(arguments)):
@@ -602,6 +608,104 @@ class DirectInspectionTests(unittest.TestCase):
             MariaDBConnector()._parts(ref)
 
         self.assertNotIn(password, str(raised.exception))
+
+    def test_csv_ref_supports_windows_1252(self):
+        pathname = self.write_csv_bytes(
+            'windows-1252.csv',
+            b'name,notes\r\nAda,\x93quoted\x94\xa0value\r\n',
+        )
+
+        root = fetch(pathname)
+
+        self.assertEqual(root['columns'], ('name', 'notes'))
+        self.assertEqual(
+            list(root['rows']),
+            [('Ada', '\u201cquoted\u201d\xa0value')],
+        )
+
+    def test_csv_ref_uses_one_encoding_for_header_and_all_rows(self):
+        pathname = self.write_csv_bytes(
+            'late-windows-1252.csv',
+            b'caf\xc3\xa9,notes\r\nAda,' + (b'x' * 70000)
+            + b'\x93late\x94\r\n',
+        )
+
+        root = fetch(pathname)
+
+        self.assertEqual(root['columns'], ('caf\xc3\xa9', 'notes'))
+        row = next(iter(root['rows']))
+        self.assertTrue(row[1].endswith('\u201clate\u201d'))
+
+    def test_csv_ref_preserves_utf8_without_a_bom(self):
+        pathname = self.write_csv_bytes(
+            'utf8.csv',
+            b'name,city\r\nAda,Montr\xc3\xa9al\r\n',
+        )
+
+        root = fetch(pathname)
+
+        self.assertEqual(root['columns'], ('name', 'city'))
+        self.assertEqual(list(root['rows']), [('Ada', 'Montr\xe9al')])
+
+    def test_csv_decode_failure_exits_without_a_traceback(self):
+        pathname = self.write_csv_bytes(
+            'unknown-encoding.csv',
+            b'name,notes\r\nAda,invalid-\x81-byte\r\n',
+        )
+        error = StringIO()
+
+        with patch.object(sys, 'argv', ['gitdata', 'ls', pathname]):
+            with redirect_stderr(error):
+                with self.assertRaises(SystemExit) as raised:
+                    main()
+
+        self.assertEqual(raised.exception.code, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "gitdata: CSV file 'unknown-encoding.csv' is not valid UTF-8 "
+            'or Windows-1252\n',
+        )
+        self.assertNotIn('Traceback', error.getvalue())
+
+    def test_csv_decode_failure_escapes_file_name(self):
+        pathname = self.write_csv_bytes(
+            'bad\x1bname.csv',
+            b'name,notes\r\nAda,invalid-\x81-byte\r\n',
+        )
+        error = StringIO()
+
+        with patch.object(sys, 'argv', ['gitdata', 'ls', pathname]):
+            with redirect_stderr(error):
+                with self.assertRaises(SystemExit):
+                    main()
+
+        self.assertIn(r"bad\x1bname.csv", error.getvalue())
+        self.assertNotIn('\x1b', error.getvalue())
+
+    def test_csv_ref_preserves_utf8_bom_support(self):
+        pathname = self.write_csv_bytes(
+            'utf8-bom.csv',
+            b'\xef\xbb\xbfname,city\r\nAda,Montr\xc3\xa9al\r\n',
+        )
+
+        root = fetch(pathname)
+
+        self.assertEqual(root['columns'], ('name', 'city'))
+        self.assertEqual(list(root['rows']), [('Ada', 'Montr\xe9al')])
+
+    def test_windows_1252_csv_preserves_row_width_validation(self):
+        pathname = self.write_csv_bytes(
+            'short-windows-1252-row.csv',
+            b'name,notes\r\nAda,\x93quoted\x94\r\nGrace\r\n',
+        )
+
+        root = fetch(pathname)
+
+        rows = iter(root['rows'])
+        self.assertEqual(next(rows), ('Ada', '\u201cquoted\u201d'))
+        with self.assertRaisesRegex(
+                ValueError, 'CSV row 3 has 1 values; expected 2'):
+            next(rows)
 
     def test_csv_ref_is_listed_and_scanned_without_a_store(self):
         pathname = self.write_csv(
