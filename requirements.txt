@@ -7,3 +7,4 @@ requests
 docopt-ng>=0.9,<1
 faker
 cryptography
+wcwidth>=0.2,<1

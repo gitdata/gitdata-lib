@@ -177,6 +177,11 @@ gitdata scan <source>        preview and profile data
 gitdata scan --limit N ...   preview at most N rows
 ```
 
+`gitdata ls` ends each listing with the number and kind of items shown, such as
+`(10 columns)`. Detailed listings and scans size their fields to the rendered
+content and available terminal width: values remain complete when they fit and
+are truncated with `...` only when needed to prevent line wrapping.
+
 Run a command with `--help` for all options:
 
 ```bash

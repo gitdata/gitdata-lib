@@ -454,7 +454,7 @@ class OracleConnectorTests(unittest.TestCase):
 
         self.assertEqual(
             output,
-            'app\n"MixedCaseOwner"\n"Danger\\x1b[31m"\n',
+            'app\n"MixedCaseOwner"\n"Danger\\x1b[31m"\n(3 schemas)\n',
         )
         self.assertNotIn('\x1b', output)
         self.assertEqual(error, '')
@@ -535,7 +535,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'ls', 'oracle://app@db.example/FREEPDB1/SALES'
             )
 
-        self.assertEqual(output, 'customers\norders\n')
+        self.assertEqual(output, 'customers\norders\n(2 tables)\n')
         self.assertEqual(error, '')
         cursor.execute.assert_called_once_with(
             'select table_name from all_tables where owner = :owner '
@@ -633,7 +633,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'ls', 'oracle+sid://app@db.example/CLIENTDB'
             )
 
-        self.assertEqual(output, '')
+        self.assertEqual(output, '(0 schemas)\n')
         self.assertEqual(error, '')
         driver.makedsn.assert_called_once_with(
             'db.example', 1521, sid='CLIENTDB'
@@ -1008,7 +1008,7 @@ class OracleConnectorTests(unittest.TestCase):
                 'ls', 'oracle://app@db.example/FREEPDB1/SALES/customers'
             )
 
-        self.assertEqual(output, 'id\n"DisplayName"\n')
+        self.assertEqual(output, 'id\n"DisplayName"\n(2 columns)\n')
         self.assertEqual(error, '')
         self.assertEqual(cursor.execute.call_count, 1)
         self.assertEqual(
