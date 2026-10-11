@@ -350,7 +350,7 @@ class DirectInspectionTests(unittest.TestCase):
                 return_value=connection) as connect:
             output = self.run_cli('ls', 'mysql://root@127.0.0.1')
 
-        self.assertEqual(output, 'gitdata_example\n(1 database)\n')
+        self.assertEqual(output, 'gitdata_example\n1 database\n')
         connect.assert_called_once_with(
             host='127.0.0.1',
             port=3306,
@@ -377,7 +377,7 @@ class DirectInspectionTests(unittest.TestCase):
 
         self.assertEqual(
             output,
-            'gitdata_example\nperformance_schema\n(2 databases)\n',
+            'gitdata_example\nperformance_schema\n2 databases\n',
         )
 
     def test_mysql_server_verbose_lists_database_stats(self):
@@ -1149,25 +1149,25 @@ class DirectInspectionTests(unittest.TestCase):
 
         output = self.run_cli('ls', pathname)
 
-        self.assertEqual(output, 'id\nname\n(2 columns)\n')
+        self.assertEqual(output, 'id\nname\n2 columns\n')
 
     def test_ls_counts_empty_and_singular_listing_levels(self):
         cases = (
             (
                 {'type': 'server', 'database_names': ()},
-                '(0 databases)\n',
+                '0 databases\n',
             ),
             (
                 {'type': 'database', 'table_names': ()},
-                '(0 tables)\n',
+                '0 tables\n',
             ),
             (
                 {'type': 'table', 'columns': (), 'rows': iter(())},
-                '(0 columns)\n',
+                '0 columns\n',
             ),
             (
                 {'type': 'table', 'columns': ('id',), 'rows': iter(())},
-                'id\n(1 column)\n',
+                'id\n1 column\n',
             ),
             (
                 {
@@ -1175,7 +1175,7 @@ class DirectInspectionTests(unittest.TestCase):
                     'item_label': 'Schema',
                     'database_names': ('APP',),
                 },
-                'APP\n(1 schema)\n',
+                'APP\n1 schema\n',
             ),
         )
 
@@ -1222,7 +1222,7 @@ class DirectInspectionTests(unittest.TestCase):
         )
         self.assertNotIn('Default', output)
         self.assertNotIn('Extra', output)
-        self.assertEqual(lines[-1], '(2 columns)')
+        self.assertEqual(lines[-1], '2 columns')
 
     def test_ls_verbose_expands_csv_examples_when_the_terminal_has_room(self):
         pathname = self.write_csv(
@@ -1313,10 +1313,10 @@ class DirectInspectionTests(unittest.TestCase):
         ordinary = self.run_cli('ls', pathname)
         all_items = self.run_cli('ls', '-a', pathname)
 
-        self.assertEqual(ordinary, 'items\n(1 table)\n')
+        self.assertEqual(ordinary, 'items\n1 table\n')
         self.assertEqual(
             all_items,
-            'items\nsqlite_sequence\n(2 tables)\n',
+            'items\nsqlite_sequence\n2 tables\n',
         )
 
     def test_ls_verbose_describes_sqlite_tables(self):
@@ -1417,7 +1417,7 @@ class DirectInspectionTests(unittest.TestCase):
 
         self.assertTrue(all(len(line) <= 60 for line in output.splitlines()))
         self.assertIn('...', output)
-        self.assertEqual(output.splitlines()[-1], '(2 columns)')
+        self.assertEqual(output.splitlines()[-1], '2 columns')
 
     def test_ls_short_listing_does_not_wrap_long_names(self):
         root = {
@@ -1432,7 +1432,7 @@ class DirectInspectionTests(unittest.TestCase):
                     return_value=os.terminal_size((20, 24))):
                 output = self.run_cli('ls', 'example.sqlite')
 
-        self.assertEqual(output, 'a_table_name_that...\n(1 table)\n')
+        self.assertEqual(output, 'a_table_name_that...\n1 table\n')
         self.assertTrue(all(len(line) <= 20 for line in output.splitlines()))
 
     def test_ls_short_listing_measures_terminal_display_width(self):

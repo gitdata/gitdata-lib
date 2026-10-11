@@ -183,7 +183,7 @@ def _print_count(root, count):
     ).lower()
     if count != 1:
         label += 's'
-    print(_fit('({} {})'.format(count, label), _terminal_width()))
+    print(_fit('{} {}'.format(count, label), _terminal_width()))
 
 
 def ls_to_console(args):
